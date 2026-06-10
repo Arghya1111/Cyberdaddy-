@@ -1,0 +1,61 @@
+# ============================================================
+# CyberDaddy - Local Development Requirements (minimal)
+# No PostgreSQL or Redis needed — uses SQLite + LocMemCache
+# ============================================================
+
+# Core
+Django==5.1.4
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+
+# Authentication
+djangorestframework-simplejwt==5.3.1
+
+# Utilities
+Pillow==11.0.0
+python-decouple==3.8
+django-filter==24.3
+drf-spectacular==0.27.2
+django-extensions==3.2.3
+
+# Static files
+whitenoise==6.8.2
+
+# Monitoring (minimal stub — no DSN needed locally)
+sentry-sdk==2.19.2
+
+# Celery (installed but not started locally)
+celery==5.4.0
+django-celery-beat==2.7.0
+django-celery-results==2.5.1
+redis==5.2.1
+django-redis==5.4.0
+
+# Prometheus
+django-prometheus==2.3.1
+
+# Payments
+stripe==11.4.0
+razorpay==1.4.2
+
+# Notifications
+twilio==9.4.1
+sendgrid==6.11.0
+
+# AI
+openai==1.57.4
+httpx==0.28.1
+
+# Storage
+boto3==1.35.80
+django-storages==1.14.4
+
+# Import/export
+django-import-export==4.3.3
+
+# Security
+django-ratelimit==4.1.0
+cryptography==43.0.3
+
+# Firebase (optional — only fails if credentials file missing)
+firebase-admin==6.6.0
