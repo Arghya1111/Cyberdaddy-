@@ -73,5 +73,5 @@ firebase-admin==6.6.0
 # AI / ML
 openai==1.57.4
 httpx==0.28.1
-python-json-logger
 setuptools>=70.0.0
+python-json-logger>=2.0.7
