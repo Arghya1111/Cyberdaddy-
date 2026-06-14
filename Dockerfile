@@ -25,9 +25,9 @@ RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
 FROM python:3.12-slim AS production
 
 # Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONFAULTHANDLER=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONFAULTHANDLER=1
 
 WORKDIR /app
 
@@ -52,8 +52,11 @@ COPY . .
 RUN mkdir -p /app/staticfiles /app/media /app/logs && \
     chown -R cyberdaddy:cyberdaddy /app
 
-# Switch to non-root user
+# Copy entrypoint script and make it executable
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Switch to non-root user
 USER cyberdaddy
 
 # Expose Django port
@@ -63,8 +66,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/api/health/ || exit 1
 
-# Entrypoint
-COPY docker/entrypoint.sh /entrypoint.sh
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
 
 ENTRYPOINT ["/entrypoint.sh"]
