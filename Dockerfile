@@ -44,6 +44,7 @@ RUN groupadd -r cyberdaddy && useradd --no-log-init -r -g cyberdaddy cyberdaddy
 # Copy pre-built wheels and install
 COPY --from=builder /build/wheels /wheels
 RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
+RUN pip install --upgrade setuptools
 
 # Copy project code
 COPY . .
