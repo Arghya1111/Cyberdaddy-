@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Shield, Menu, Bell, Search } from 'lucide-react';
+import { Shield, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
+import NotificationBell from './NotificationBell';
 
 const PAGE_TITLES: Record<string, string> = {
   '/chat': 'AI Assistant',
@@ -38,12 +39,7 @@ export default function TopBar() {
           <span className="font-bold text-white text-sm">{title}</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors relative">
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-400" />
-          </button>
-        </div>
+        <NotificationBell />
       </header>
 
       {/* Mobile sidebar drawer */}

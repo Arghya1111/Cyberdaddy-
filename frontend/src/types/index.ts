@@ -22,6 +22,7 @@ export interface Message {
     riskScore?: RiskScore;
     command?: SlashCommand;
     component?: 'pricing' | 'dashboard-preview' | 'help';
+    scanId?: string;
   };
 }
 
@@ -57,14 +58,16 @@ export interface DashboardStats {
 
 export type SubscriptionTier = 'Free' | 'Pro' | 'Family' | 'Enterprise';
 
+// Updated Scan type to support both backend-mapped and legacy usage
 export interface Scan {
   id: string;
   timestamp: Date;
   fileName: string;
-  riskScore: number;
+  // riskScore can be the legacy number format OR the full RiskScore object
+  riskScore: number | RiskScore;
   riskLevel: RiskScore['level'];
   category: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: 'completed' | 'pending' | 'failed' | 'safe' | 'threat' | 'analyzing';
 }
 
 export interface AiInsight {

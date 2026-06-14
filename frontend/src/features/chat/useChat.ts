@@ -1,11 +1,19 @@
 'use client';
 
+// ============================================================
+// CyberDaddy — Chat Hook
+// Handles AI chat via Groq (client-side streaming) and
+// submits scans to the Django backend for persistence.
+// ============================================================
+
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Message, Attachment, GroqMessage } from '@/types';
 import { chatCompletion, analyzeScreenshot, generateRiskScore } from '@/services/groq';
 import { routeCommand } from './commandRouter';
 import { generateId, fileToBase64 } from '@/lib/utils';
+import { scanService } from '@/lib/apiServices';
+import { getAccessToken } from '@/lib/auth';
 
 const WELCOME_MESSAGE: Message = {
   id: 'welcome',
@@ -89,7 +97,7 @@ export function useChat() {
         // ── 3. Screenshot analysis ───────────────────────
         if (attachments?.length) {
           const img = attachments[0];
-          
+
           // Placeholder message
           const placeholderMsg: Message = {
             id: generateId(),
@@ -99,6 +107,7 @@ export function useChat() {
           };
           addMessage(placeholderMsg);
 
+          // Run Groq analysis
           const analysis = await analyzeScreenshot(img.url);
           const riskScore = await generateRiskScore(analysis);
 
@@ -112,16 +121,56 @@ export function useChat() {
 
           setMessages((prev) => {
             const copy = [...prev];
-            // Replace placeholder
+            // Replace placeholder with real result
             copy[copy.length - 1] = analysisMsg;
             return copy;
           });
+
+          // ── Save scan to backend (fire-and-forget) ───────
+          // Only if user is authenticated
+          if (getAccessToken()) {
+            try {
+              // Convert data URL to File for upload
+              const response = await fetch(img.url);
+              const blob = await response.blob();
+              const file = new File([blob], img.name ?? 'screenshot.jpg', { type: blob.type || 'image/jpeg' });
+              const result = await scanService.submitScreenshotScan(file);
+              // Silently update message with backend scan ID for reference
+              if (result?.scan_id) {
+                setMessages((prev) => {
+                  const copy = [...prev];
+                  const last = copy[copy.length - 1];
+                  if (last?.id === analysisMsg.id) {
+                    copy[copy.length - 1] = {
+                      ...last,
+                      metadata: { ...last.metadata, scanId: result.scan_id },
+                    };
+                  }
+                  return copy;
+                });
+              }
+            } catch {
+              // Don't show error to user — backend save is non-critical
+              // The Groq analysis already showed a result
+            }
+          }
 
           setIsLoading(false);
           return;
         }
 
-        // ── 4. Regular chat (streaming) ──────────────────
+        // ── 4. Text scan (SMS/URL) detection via backend ─
+        // If user pastes a URL or SMS-like message, also submit to backend
+        const isUrl = /^https?:\/\//i.test(text.trim());
+        const isSmsLike = text.length < 500 && text.length > 10 && !text.includes('\n');
+        
+        if ((isUrl || isSmsLike) && getAccessToken() && !text.startsWith('/')) {
+          // Submit text scan in background (non-blocking)
+          const scanType = isUrl ? 'url' : 'sms';
+          scanService.submitTextScan({ scan_type: scanType, content: text.trim() }).catch(() => {});
+        }
+
+        // ── 5. Regular chat (streaming) ──────────────────
         const history: GroqMessage[] = messages
           .filter((m) => m.id !== 'welcome')
           .slice(-10)

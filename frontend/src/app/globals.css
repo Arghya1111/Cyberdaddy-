@@ -47,7 +47,8 @@ html {
 body {
   background-color: var(--cd-bg);
   color: hsl(var(--foreground));
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  /* Use the CSS variable injected by the Geist font in layout.tsx */
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

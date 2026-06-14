@@ -1,23 +1,36 @@
 'use client';
 
-import { Scan } from '@/types';
+import { Scan, RiskScore } from '@/types';
 import { formatTimestamp, getRiskBgClass } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { FileImage, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { FileImage, CheckCircle, Clock, XCircle, ShieldAlert } from 'lucide-react';
 
 interface RecentScansProps {
   scans: Scan[];
 }
 
-const STATUS_ICON: Record<Scan['status'], typeof CheckCircle> = {
+// Handle riskScore as either number or RiskScore object
+function getRiskValue(riskScore: number | RiskScore): number {
+  if (typeof riskScore === 'number') return riskScore;
+  return riskScore.score;
+}
+
+const STATUS_ICON: Record<string, typeof CheckCircle> = {
   completed: CheckCircle,
   pending: Clock,
   failed: XCircle,
+  safe: CheckCircle,
+  threat: ShieldAlert,
+  analyzing: Clock,
 };
-const STATUS_COLOR: Record<Scan['status'], string> = {
+
+const STATUS_COLOR: Record<string, string> = {
   completed: 'text-emerald-400',
   pending: 'text-yellow-400',
   failed: 'text-red-400',
+  safe: 'text-emerald-400',
+  threat: 'text-red-400',
+  analyzing: 'text-yellow-400',
 };
 
 export default function RecentScans({ scans }: RecentScansProps) {
@@ -29,7 +42,9 @@ export default function RecentScans({ scans }: RecentScansProps) {
       </div>
       <div className="space-y-2">
         {scans.map((scan) => {
-          const StatusIcon = STATUS_ICON[scan.status];
+          const score = getRiskValue(scan.riskScore);
+          const StatusIcon = STATUS_ICON[scan.status] ?? CheckCircle;
+          const statusColor = STATUS_COLOR[scan.status] ?? 'text-white/40';
           return (
             <div
               key={scan.id}
@@ -50,7 +65,7 @@ export default function RecentScans({ scans }: RecentScansProps) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <StatusIcon className={cn('w-3 h-3', STATUS_COLOR[scan.status])} />
+                  <StatusIcon className={cn('w-3 h-3', statusColor)} />
                   <span className="text-[10px] text-white/30">{formatTimestamp(scan.timestamp)}</span>
                 </div>
               </div>
@@ -58,10 +73,10 @@ export default function RecentScans({ scans }: RecentScansProps) {
               <div className="text-right flex-shrink-0">
                 <div className={cn(
                   'text-sm font-bold tabular-nums',
-                  scan.riskScore >= 70 ? 'text-red-400' :
-                  scan.riskScore >= 40 ? 'text-yellow-400' : 'text-emerald-400'
+                  score >= 70 ? 'text-red-400' :
+                  score >= 40 ? 'text-yellow-400' : 'text-emerald-400'
                 )}>
-                  {scan.riskScore}
+                  {score}
                 </div>
                 <div className="text-[10px] text-white/20">risk</div>
               </div>
