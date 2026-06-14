@@ -53,6 +53,7 @@ RUN mkdir -p /app/staticfiles /app/media /app/logs && \
     chown -R cyberdaddy:cyberdaddy /app
 
 # Switch to non-root user
+RUN chmod +x /entrypoint.sh
 USER cyberdaddy
 
 # Expose Django port
@@ -65,5 +66,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # Entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
-RUN chmod +x /entrypoint.sh
+
 ENTRYPOINT ["/entrypoint.sh"]
