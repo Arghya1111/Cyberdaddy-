@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and install wheel
-RUN pip install --upgrade pip wheel
+RUN pip install --upgrade pip wheel setuptools
 
 # Copy and install Python dependencies
 COPY requirements.txt .
