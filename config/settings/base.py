@@ -9,16 +9,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 from decouple import config, Csv
-import os
-import dj_database_url
 
-DATABASES = {
-    "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=True,
-    )
-}
 
 # ============================================================
 # Paths
@@ -117,22 +108,18 @@ ASGI_APPLICATION = "config.asgi.application"
 # ============================================================
 # Database - PostgreSQL with Connection Pooling
 # ============================================================
+# ============================================================
+# Database
+# ============================================================
+
+import dj_database_url
+
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_NAME", default="cyberdaddy"),
-        "USER": config("DB_USER", default="cyberdaddy_user"),
-        "PASSWORD": config("DB_PASSWORD"),
-        "HOST": config("DB_HOST", default="postgres"),
-        "PORT": config("DB_PORT", default="5432"),
-        "OPTIONS": {
-            "connect_timeout": 10,
-            "options": "-c default_transaction_isolation=read committed",
-        },
-        # Connection pooling via PgBouncer (set pool size in PgBouncer config)
-        "CONN_MAX_AGE": 60,
-        "CONN_HEALTH_CHECKS": True,
-    }
+    "default": dj_database_url.config(
+        default=os.environ.get("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True,
+    )
 }
 
 # ============================================================
