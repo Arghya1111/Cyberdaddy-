@@ -18,8 +18,8 @@
   },
   "rewrites": [
     {
-      "source": "/api/v1/:path*",
-      "destination": "https://cyberdaddy.onrender.com/api/v1/:path*"
+      "source": "/api/:path*",
+      "destination": "https://cyberdaddy.onrender.com/api/:path*"
     }
   ]
 }
