@@ -18,7 +18,10 @@ services:
     healthCheckPath: /api/v1/health/
     envVars:
       - key: DJANGO_SETTINGS_MODULE
-        value: config.settings.production
+        # Using render.py: replaces Redis cache with LocMemCache, disables
+        # DRF throttling, runs Celery tasks eagerly, and fixes logging/static.
+        # Switch back to config.settings.production once Redis is provisioned.
+        value: config.settings.render
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
@@ -31,21 +34,25 @@ services:
         fromDatabase:
           name: cyberdaddy-db
           property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          name: cyberdaddy-redis
-          type: redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          name: cyberdaddy-redis
-          type: redis
-          property: connectionString
-      - key: CACHE_URL
-        fromService:
-          name: cyberdaddy-redis
-          type: redis
-          property: connectionString
+      # CACHE_URL / CELERY_BROKER_URL / CELERY_RESULT_BACKEND are intentionally
+      # omitted: render.py uses LocMemCache and CELERY_TASK_ALWAYS_EAGER so no
+      # Redis service is needed.  Uncomment the block below once Redis is added:
+      #
+      # - key: CELERY_BROKER_URL
+      #   fromService:
+      #     name: cyberdaddy-redis
+      #     type: redis
+      #     property: connectionString
+      # - key: CELERY_RESULT_BACKEND
+      #   fromService:
+      #     name: cyberdaddy-redis
+      #     type: redis
+      #     property: connectionString
+      # - key: CACHE_URL
+      #   fromService:
+      #     name: cyberdaddy-redis
+      #     type: redis
+      #     property: connectionString
       # Secrets — set manually in Render dashboard
       - key: STRIPE_PUBLIC_KEY
         sync: false
@@ -91,61 +98,72 @@ services:
         sync: false
 
   # ── Celery Worker ─────────────────────────────────────────
-  - type: worker
-    name: cyberdaddy-worker
-    env: python
-    region: singapore
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A config.celery_app worker --loglevel=info --queues=default,ai,notifications,scans
-    envVars:
-      - key: DJANGO_SETTINGS_MODULE
-        value: config.settings.production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: cyberdaddy-db
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          name: cyberdaddy-redis
-          type: redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          name: cyberdaddy-redis
-          type: redis
-          property: connectionString
-      - key: SECRET_KEY
-        fromService:
-          name: cyberdaddy-api
-          type: web
-          envVarKey: SECRET_KEY
+  # TEMPORARILY SUSPENDED: Celery worker requires a live Redis broker.
+  # Since render.py runs tasks eagerly (CELERY_TASK_ALWAYS_EAGER=True),
+  # the web process handles all tasks inline — no separate worker needed.
+  #
+  # To re-enable:
+  #   1. Add a Render Redis service (type: redis, not under databases:)
+  #   2. Uncomment this block
+  #   3. Change DJANGO_SETTINGS_MODULE back to config.settings.production
+  #
+  # - type: worker
+  #   name: cyberdaddy-worker
+  #   env: python
+  #   region: singapore
+  #   plan: starter
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: celery -A config.celery_app worker --loglevel=info --queues=default,ai,notifications,scans
+  #   envVars:
+  #     - key: DJANGO_SETTINGS_MODULE
+  #       value: config.settings.production
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: cyberdaddy-db
+  #         property: connectionString
+  #     - key: CELERY_BROKER_URL
+  #       fromService:
+  #         name: cyberdaddy-redis
+  #         type: redis
+  #         property: connectionString
+  #     - key: CELERY_RESULT_BACKEND
+  #       fromService:
+  #         name: cyberdaddy-redis
+  #         type: redis
+  #         property: connectionString
+  #     - key: SECRET_KEY
+  #       fromService:
+  #         name: cyberdaddy-api
+  #         type: web
+  #         envVarKey: SECRET_KEY
 
   # ── Celery Beat Scheduler ─────────────────────────────────
-  - type: worker
-    name: cyberdaddy-beat
-    env: python
-    region: singapore
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A config.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    envVars:
-      - key: DJANGO_SETTINGS_MODULE
-        value: config.settings.production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: cyberdaddy-db
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          name: cyberdaddy-redis
-          type: redis
-          property: connectionString
-      - key: SECRET_KEY
-        fromService:
-          name: cyberdaddy-api
-          type: web
-          envVarKey: SECRET_KEY
+  # TEMPORARILY SUSPENDED: same Redis requirement as worker above.
+  #
+  # - type: worker
+  #   name: cyberdaddy-beat
+  #   env: python
+  #   region: singapore
+  #   plan: starter
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: celery -A config.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+  #   envVars:
+  #     - key: DJANGO_SETTINGS_MODULE
+  #       value: config.settings.production
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: cyberdaddy-db
+  #         property: connectionString
+  #     - key: CELERY_BROKER_URL
+  #       fromService:
+  #         name: cyberdaddy-redis
+  #         type: redis
+  #         property: connectionString
+  #     - key: SECRET_KEY
+  #       fromService:
+  #         name: cyberdaddy-api
+  #         type: web
+  #         envVarKey: SECRET_KEY
 
 databases:
   # ── PostgreSQL ────────────────────────────────────────────
@@ -157,8 +175,14 @@ databases:
     postgresMajorVersion: 16
 
   # ── Redis ─────────────────────────────────────────────────
-  - name: cyberdaddy-redis
-    plan: starter
-    region: singapore
-    # Note: Render Redis is a separate service type; update to:
-    # type: redis  (use Render's Redis service, not the database block)
+  # Redis is NOT provisioned here because the web service currently
+  # uses LocMemCache (config.settings.render).  When you are ready to
+  # add Redis, move this entry to the services: block above with:
+  #
+  #   - type: redis
+  #     name: cyberdaddy-redis
+  #     plan: starter
+  #     region: singapore
+  #
+  # Then un-comment the CACHE_URL / CELERY_BROKER_URL env vars in the
+  # web service block and restore config.settings.production.
