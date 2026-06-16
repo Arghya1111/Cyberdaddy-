@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Message, Attachment, GroqMessage } from '@/types';
 import { chatCompletion, analyzeScreenshot, generateRiskScore } from '@/services/groq';
 import { routeCommand } from './commandRouter';
-import { generateId, fileToBase64 } from '@/lib/utils';
+import { generateId } from '@/lib/utils';
 import { scanService } from '@/lib/apiServices';
 import { getAccessToken } from '@/lib/auth';
 

@@ -10,11 +10,18 @@ from datetime import timedelta
 from pathlib import Path
 from decouple import config, Csv
 
+# Sentry is initialised in production.py (with full integrations).
+# Nothing to do here in base — avoids double-initialisation.
+
 
 # ============================================================
 # Paths
 # ============================================================
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Read DATABASE_URL early so INSTALLED_APPS can use it to decide
+# whether to include django.contrib.postgres.
+_DATABASE_URL = config("DATABASE_URL", default="")
 
 # ============================================================
 # Application Definition
@@ -26,7 +33,8 @@ DJANGO_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.postgres",  # Postgres-specific features (JSONField, ArrayField, etc.)
+    # django.contrib.postgres is added only when DATABASE_URL points to PostgreSQL.
+    # local.py strips it out so SQLite dev works without psycopg2.
 ]
 
 THIRD_PARTY_APPS = [
@@ -56,6 +64,11 @@ LOCAL_APPS = [
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+
+# Add django.contrib.postgres only when the active database is PostgreSQL.
+# Prevents import errors on SQLite local dev (psycopg2 not required).
+if _DATABASE_URL and _DATABASE_URL.startswith("postgres"):
+    INSTALLED_APPS = ["django.contrib.postgres"] + INSTALLED_APPS
 
 # ============================================================
 # Custom User Model
@@ -106,21 +119,40 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # ============================================================
-# Database - PostgreSQL with Connection Pooling
-# ============================================================
-# ============================================================
 # Database
 # ============================================================
+# Uses DATABASE_URL when provided (production / Supabase / Render).
+# Falls back to SQLite so local dev never needs PostgreSQL.
+# local.py overrides this entirely with an explicit SQLite block.
 
-import dj_database_url
+# _DATABASE_URL is already read at the top of this file.
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=True,
-    )
-}
+if _DATABASE_URL:
+    try:
+        import dj_database_url as _dj_database_url
+        DATABASES = {
+            "default": _dj_database_url.config(
+                default=_DATABASE_URL,
+                conn_max_age=600,
+                ssl_require=_DATABASE_URL.startswith("postgres"),
+            )
+        }
+    except ImportError:
+        # dj-database-url not available: fall back to SQLite
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "db.sqlite3",
+            }
+        }
+else:
+    # No DATABASE_URL → SQLite (safe default for local development)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # ============================================================
 # Cache - Redis
@@ -327,6 +359,12 @@ STRIPE_PUBLIC_KEY = config("STRIPE_PUBLIC_KEY", default="")
 STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="")
 STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")
 
+# Stripe Price IDs — configure in Stripe Dashboard, then set in .env
+STRIPE_PRICE_PREMIUM_MONTHLY = config("STRIPE_PRICE_PREMIUM_MONTHLY", default="")
+STRIPE_PRICE_PREMIUM_YEARLY = config("STRIPE_PRICE_PREMIUM_YEARLY", default="")
+STRIPE_PRICE_FAMILY_MONTHLY = config("STRIPE_PRICE_FAMILY_MONTHLY", default="")
+STRIPE_PRICE_FAMILY_YEARLY = config("STRIPE_PRICE_FAMILY_YEARLY", default="")
+
 # ============================================================
 # Razorpay Payment Gateway
 # ============================================================
@@ -348,6 +386,11 @@ OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 OPENAI_MODEL = config("OPENAI_MODEL", default="gpt-4o")
 OPENAI_MAX_TOKENS = 2048
 OPENAI_TEMPERATURE = 0.2  # Low temperature for factual security analysis
+
+# ============================================================
+# Groq AI (preferred over OpenAI — faster & cheaper)
+# ============================================================
+GROQ_API_KEY = config("GROQ_API_KEY", default="")
 
 # ============================================================
 # Firebase (Push Notifications)

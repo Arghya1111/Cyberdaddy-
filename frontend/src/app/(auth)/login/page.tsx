@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [slowRequest, setSlowRequest] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -27,7 +28,10 @@ export default function LoginPage() {
     if (!email.trim() || !password.trim()) return;
 
     setIsLoading(true);
+    setSlowRequest(false);
     setError(null);
+
+    const slowTimer = setTimeout(() => setSlowRequest(true), 8_000);
 
     try {
       await login(email.trim(), password);
@@ -36,6 +40,8 @@ export default function LoginPage() {
       const normalized = normalizeError(err);
       setError(normalized.message || 'Login failed. Please check your credentials.');
     } finally {
+      clearTimeout(slowTimer);
+      setSlowRequest(false);
       setIsLoading(false);
     }
   };
@@ -55,6 +61,14 @@ export default function LoginPage() {
         <p className="text-white/40 text-sm text-center mb-8">
           Sign in to your CyberDaddy account
         </p>
+
+        {/* Slow-request hint */}
+        {slowRequest && !error && (
+          <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm">
+            <Loader2 className="w-4 h-4 flex-shrink-0 mt-0.5 animate-spin" />
+            <span>The server is waking up — this can take up to 30 s on first use. Please wait&hellip;</span>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

@@ -10,7 +10,7 @@ django-cors-headers==4.6.0
 
 # Database
 psycopg2-binary==2.9.10
-django-db-geventpool==4.0.1
+dj-database-url>=2.2.0
 
 # Authentication
 djangorestframework-simplejwt==5.3.1
@@ -28,6 +28,7 @@ boto3==1.35.80
 django-storages==1.14.4
 
 # Payment Gateways
+stripe==11.4.0
 razorpay==1.4.2
 
 # Utilities
@@ -45,6 +46,7 @@ cryptography==43.0.3
 # Monitoring & Logging
 sentry-sdk[django]==2.19.2
 django-prometheus==2.3.1
+python-json-logger>=2.0.7
 
 # Testing
 pytest==8.3.4
@@ -72,8 +74,8 @@ firebase-admin==6.6.0
 # AI / ML
 openai==1.57.4
 httpx==0.28.1
+
+# Misc
 setuptools==75.6.0
-python-json-logger>=2.0.7
-dj-database-url>=2.2.0
 whitenoise==6.8.2
 typing-extensions>=4.12.2

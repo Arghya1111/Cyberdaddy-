@@ -1,0 +1,164 @@
+# ============================================================
+# CyberDaddy - Render.com Infrastructure-as-Code
+# Deploy: Web Service + PostgreSQL + Redis
+# ============================================================
+
+services:
+  # ── Django Web Service ────────────────────────────────────
+  - type: web
+    name: cyberdaddy-api
+    env: python
+    region: singapore
+    plan: starter
+    buildCommand: |
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate --noinput
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: cyberdaddy-api.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://cyberdaddy.in
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cyberdaddy-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: cyberdaddy-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: cyberdaddy-redis
+          type: redis
+          property: connectionString
+      - key: CACHE_URL
+        fromService:
+          name: cyberdaddy-redis
+          type: redis
+          property: connectionString
+      # Secrets — set manually in Render dashboard
+      - key: STRIPE_PUBLIC_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PREMIUM_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_PREMIUM_YEARLY
+        sync: false
+      - key: STRIPE_PRICE_FAMILY_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_FAMILY_YEARLY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: FIREBASE_CREDENTIALS_PATH
+        sync: false
+
+  # ── Celery Worker ─────────────────────────────────────────
+  - type: worker
+    name: cyberdaddy-worker
+    env: python
+    region: singapore
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A config.celery_app worker --loglevel=info --queues=default,ai,notifications,scans
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cyberdaddy-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: cyberdaddy-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: cyberdaddy-redis
+          type: redis
+          property: connectionString
+      - key: SECRET_KEY
+        fromService:
+          name: cyberdaddy-api
+          type: web
+          envVarKey: SECRET_KEY
+
+  # ── Celery Beat Scheduler ─────────────────────────────────
+  - type: worker
+    name: cyberdaddy-beat
+    env: python
+    region: singapore
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A config.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cyberdaddy-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: cyberdaddy-redis
+          type: redis
+          property: connectionString
+      - key: SECRET_KEY
+        fromService:
+          name: cyberdaddy-api
+          type: web
+          envVarKey: SECRET_KEY
+
+databases:
+  # ── PostgreSQL ────────────────────────────────────────────
+  - name: cyberdaddy-db
+    databaseName: cyberdaddy
+    user: cyberdaddy
+    plan: starter
+    region: singapore
+    postgresMajorVersion: 16
+
+  # ── Redis ─────────────────────────────────────────────────
+  - name: cyberdaddy-redis
+    plan: starter
+    region: singapore
+    # Note: Render Redis is a separate service type; update to:
+    # type: redis  (use Render's Redis service, not the database block)

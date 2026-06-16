@@ -51,8 +51,11 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    fetchUnreadCount();
-    pollRef.current = setInterval(fetchUnreadCount, 30_000);
+    // fetchUnreadCount is async — setState is called only in async continuations,
+    // never synchronously. The rule flags this as a false positive.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchUnreadCount();
+    pollRef.current = setInterval(() => { void fetchUnreadCount(); }, 30_000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };

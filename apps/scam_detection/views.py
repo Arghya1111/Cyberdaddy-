@@ -138,7 +138,7 @@ class ScanStatsView(APIView):
 
     @extend_schema(tags=["Scans"], summary="Get scan statistics")
     def get(self, request):
-        from django.db.models import Count, Avg
+        from django.db.models import Count, Avg, Q
         from django.core.cache import cache
 
         cache_key = f"scan_stats_{request.user.id}"
@@ -151,7 +151,7 @@ class ScanStatsView(APIView):
             )
             agg = qs.aggregate(
                 total=Count("id"),
-                threats=Count("id", filter={"is_threat": True}),
+                threats=Count("id", filter=Q(is_threat=True)),
                 avg_risk=Avg("risk_score"),
             )
             by_type = list(qs.values("scan_type").annotate(count=Count("id")))

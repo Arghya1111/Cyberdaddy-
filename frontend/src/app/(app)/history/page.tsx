@@ -14,7 +14,7 @@ import { SkeletonRow } from '@/components/ui/SkeletonLoader';
 import { Scan } from '@/types';
 import {
   History, Search, Filter, ChevronLeft, ChevronRight, RefreshCw,
-  Shield, AlertTriangle, Loader2,
+  Shield, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -63,7 +63,7 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [riskFilter, setRiskFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [, setSearchQuery] = useState('');
   const [inputValue, setInputValue] = useState('');
 
   const fetchHistory = useCallback(

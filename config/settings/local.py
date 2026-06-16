@@ -16,6 +16,24 @@ SECRET_KEY = config("SECRET_KEY", default="dev-secret-key-change-in-production-!
 ALLOWED_HOSTS = ["*"]
 
 # ============================================================
+# ngrok tunnel support
+# ============================================================
+# Allow ngrok tunnel hosts so Django does not reject requests via ngrok.
+# ALLOWED_HOSTS = ["*"] already covers this, but also add the ngrok
+# hostname explicitly so CSRF middleware and secure cookies work.
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000",
+    cast=Csv(),
+)
+
+# ============================================================
+# Dev convenience: auto-verify email on registration
+# so scan endpoints (IsEmailVerified) work without real SMTP
+# ============================================================
+DEV_AUTO_VERIFY_EMAIL = True
+
+# ============================================================
 # Database - Use SQLite for ultra-fast local testing
 # Or keep PostgreSQL (recommended for parity with production)
 # ============================================================
@@ -75,6 +93,19 @@ CORS_ALLOW_ALL_ORIGINS = True
 DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 # ============================================================
+# Payment stub values for local development
+# (real values only needed when testing payment flows)
+# ============================================================
+STRIPE_PRICE_PREMIUM_MONTHLY = config("STRIPE_PRICE_PREMIUM_MONTHLY", default="price_local_premium_monthly")  # noqa
+STRIPE_PRICE_PREMIUM_YEARLY = config("STRIPE_PRICE_PREMIUM_YEARLY", default="price_local_premium_yearly")    # noqa
+STRIPE_PRICE_FAMILY_MONTHLY = config("STRIPE_PRICE_FAMILY_MONTHLY", default="price_local_family_monthly")    # noqa
+STRIPE_PRICE_FAMILY_YEARLY = config("STRIPE_PRICE_FAMILY_YEARLY", default="price_local_family_yearly")       # noqa
+
+# Celery — run tasks synchronously in dev so no worker is needed
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# ============================================================
 # Logging - Verbose in development
 # ============================================================
 LOGGING = {
@@ -93,11 +124,12 @@ LOGGING = {
             "formatter": "verbose",
         },
     },
-    "root": {"handlers": ["console"], "level": "DEBUG"},
+    "root": {"handlers": ["console"], "level": "INFO"},
     "loggers": {
         "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
-        "django.db.backends": {"handlers": ["console"], "level": "DEBUG", "propagate": False},
+        # Set to DEBUG only when actively debugging SQL — very noisy otherwise
+        "django.db.backends": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         "apps": {"handlers": ["console"], "level": "DEBUG", "propagate": False},
-        "celery": {"handlers": ["console"], "level": "DEBUG", "propagate": False},
+        "celery": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }

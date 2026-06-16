@@ -23,13 +23,15 @@ export function useApi<T>(
   fetchFn: () => Promise<T>,
   options?: { enabled?: boolean; deps?: unknown[] }
 ): UseApiState<T> {
+  const enabled = options?.enabled ?? true;
+
   const [data, setData] = useState<T | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Initialise isLoading=false when the hook is disabled to avoid a
+  // synchronous setState call inside the effect (react-hooks/set-state-in-effect).
+  const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<APIError | null>(null);
   const mountedRef = useRef(true);
   const [trigger, setTrigger] = useState(0);
-
-  const enabled = options?.enabled ?? true;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -40,7 +42,7 @@ export function useApi<T>(
 
   useEffect(() => {
     if (!enabled) {
-      setIsLoading(false);
+      // isLoading was already initialised to false; nothing to set synchronously.
       return;
     }
 

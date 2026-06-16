@@ -68,8 +68,9 @@ class ThreatSearchView(APIView):
 
         if not results:
             qs = ThreatDatabase.objects.filter(is_active=True)
-            # Full-text search using pg_trgm trigram similarity
-            from django.contrib.postgres.search import SearchVector, SearchQuery
+            # icontains works on both SQLite (dev) and PostgreSQL (prod).
+            # For production full-text search, consider adding a SearchVectorField
+            # to ThreatDatabase and using Django's postgres SearchVector.
             qs = qs.filter(
                 title__icontains=query
             ) | qs.filter(

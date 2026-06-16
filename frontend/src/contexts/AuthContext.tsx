@@ -10,10 +10,9 @@ import React, {
 } from 'react';
 import {
   getAccessToken, getRefreshToken, getStoredUser, setTokens, setStoredUser,
-  clearTokens, isAuthenticated as checkIsAuthenticated, StoredUser,
+  clearTokens, isAuthenticated as checkIsAuthenticated,
 } from '@/lib/auth';
 import { authService, userService, APIUser } from '@/lib/apiServices';
-import { APIError, normalizeError } from '@/lib/api';
 
 // ─── Context Types ────────────────────────────────────────
 

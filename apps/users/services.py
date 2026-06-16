@@ -41,17 +41,24 @@ class UserService:
         # Create email auth record
         UserAuth.objects.create(user=user, provider=UserAuth.AuthProvider.EMAIL, is_primary=True)
 
-        # Send verification email — synchronous on PythonAnywhere (console backend),
-        # async via Celery worker in full production.
-        from apps.users.tasks import send_email_verification_task
+        # Auto-verify email in local dev so scan endpoints work without real SMTP.
         from django.conf import settings as _settings
-        if getattr(_settings, 'CELERY_TASK_ALWAYS_EAGER', False):
-            try:
-                send_email_verification_task(str(user.id))
-            except Exception as exc:
-                logger.warning(f"Verification email failed (non-critical for demo): {exc}")
+        if getattr(_settings, 'DEV_AUTO_VERIFY_EMAIL', False):
+            user.is_email_verified = True
+            user.account_status = User.AccountStatus.ACTIVE
+            user.save(update_fields=["is_email_verified", "account_status"])
+            logger.info(f"DEV_AUTO_VERIFY_EMAIL: auto-verified {user.email}")
         else:
-            send_email_verification_task.delay(str(user.id))
+            # Send verification email — synchronous on PythonAnywhere (console backend),
+            # async via Celery worker in full production.
+            from apps.users.tasks import send_email_verification_task
+            if getattr(_settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+                try:
+                    send_email_verification_task(str(user.id))
+                except Exception as exc:
+                    logger.warning(f"Verification email failed (non-critical for demo): {exc}")
+            else:
+                send_email_verification_task.delay(str(user.id))
 
         logger.info(f"New user created: {email}")
         return user
@@ -248,9 +255,21 @@ class SessionService:
 
     @staticmethod
     def logout_session(user: User, session_id: str) -> bool:
-        """Logout a specific session by ID."""
+        """Logout a specific session by session UUID."""
         try:
             session = UserSession.objects.get(id=session_id, user=user, is_active=True)
+            session.logout()
+            return True
+        except UserSession.DoesNotExist:
+            return False
+
+    @staticmethod
+    def logout_session_by_jti(user: User, jti: str) -> bool:
+        """Logout the session identified by a JWT JTI claim."""
+        if not jti:
+            return False
+        try:
+            session = UserSession.objects.get(jwt_jti=jti, user=user, is_active=True)
             session.logout()
             return True
         except UserSession.DoesNotExist:
