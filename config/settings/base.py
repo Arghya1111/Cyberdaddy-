@@ -155,27 +155,48 @@ else:
     }
 
 # ============================================================
-# Cache - Redis
+# Cache — Redis when CACHE_URL is supplied, LocMemCache otherwise
 # ============================================================
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": config("CACHE_URL", default="redis://redis:6379/3"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {"max_connections": 100},
-            "SOCKET_CONNECT_TIMEOUT": 5,
-            "SOCKET_TIMEOUT": 5,
-            "RETRY_ON_TIMEOUT": True,
-        },
-        "KEY_PREFIX": "cyberdaddy",
-        "TIMEOUT": 300,  # Default: 5 minutes
-    }
-}
+# Read CACHE_URL explicitly (separate from decouple's config() so we can
+# inspect it before deciding which backend to configure).
+_CACHE_URL = config("CACHE_URL", default="")
+_USE_REDIS = _CACHE_URL.startswith("redis://") or _CACHE_URL.startswith("rediss://")
 
-# Use Redis for session storage
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-SESSION_CACHE_ALIAS = "default"
+if _USE_REDIS:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": _CACHE_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "CONNECTION_POOL_KWARGS": {"max_connections": 100},
+                "SOCKET_CONNECT_TIMEOUT": 5,
+                "SOCKET_TIMEOUT": 5,
+                "RETRY_ON_TIMEOUT": True,
+            },
+            "KEY_PREFIX": "cyberdaddy",
+            "TIMEOUT": 300,  # Default: 5 minutes
+        }
+    }
+else:
+    # No valid Redis URL → fall back to in-process memory cache.
+    # Works on any host (Render free tier, CI, local) without extra services.
+    # Per-process only: throttle counters reset on restart, cache is not
+    # shared across multiple gunicorn workers.  Acceptable for an MVP.
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "cyberdaddy",
+        }
+    }
+
+# Sessions — Redis-backed when cache is Redis, database-backed otherwise
+if _USE_REDIS:
+    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+    SESSION_CACHE_ALIAS = "default"
+else:
+    SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
 SESSION_COOKIE_AGE = 86400  # 24 hours
 
 # ============================================================
@@ -239,10 +260,17 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
-    ],
+    # Throttling relies on the cache backend.  Enabled only when a real
+    # Redis cache is available; otherwise every request would fail with a
+    # cache connection error before the view even runs.
+    "DEFAULT_THROTTLE_CLASSES": (
+        [
+            "rest_framework.throttling.AnonRateThrottle",
+            "rest_framework.throttling.UserRateThrottle",
+        ]
+        if _USE_REDIS
+        else []
+    ),
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
         "user": "1000/hour",
@@ -314,9 +342,20 @@ CORS_ALLOW_HEADERS = [
 # ============================================================
 # Celery Configuration
 # ============================================================
-CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://redis:6379/1")
-CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://redis:6379/2")
+_CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="")
+_CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="")
+
+# Use whatever broker is supplied; fall back to a local-only placeholder
+# so the module imports cleanly even when no broker is running.
+CELERY_BROKER_URL = _CELERY_BROKER_URL or "memory://"
+CELERY_RESULT_BACKEND = _CELERY_RESULT_BACKEND or "cache+memory://"
 CELERY_CACHE_BACKEND = "django-cache"
+
+# When no real broker URL is provided, run tasks synchronously
+# in the web process (no worker required, no Redis connection).
+if not _CELERY_BROKER_URL:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]

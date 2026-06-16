@@ -3,10 +3,11 @@ CyberDaddy - Production Settings
 Inherits from base and applies production-grade hardening.
 """
 
+import os
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
 
 from .base import *  # noqa
 
@@ -33,22 +34,32 @@ CSRF_COOKIE_HTTPONLY = True
 
 # ============================================================
 # AWS S3 Media Storage
+# Only activate S3 when credentials are present.  Without them
+# collectstatic crashes at build time and gunicorn crashes at startup.
 # ============================================================
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
+if config("AWS_ACCESS_KEY_ID", default=""):
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
+# else: keep base.py defaults (WhiteNoise + local filesystem)
 
 # ============================================================
 # Sentry - Error Monitoring & Performance Tracing
 # ============================================================
 SENTRY_DSN = config("SENTRY_DSN", default="")
 if SENTRY_DSN:
+    _sentry_integrations = [
+        DjangoIntegration(transaction_style="url"),
+        CeleryIntegration(),
+    ]
+    # Add RedisIntegration only when Redis is actually in use; avoids
+    # an import-time connection attempt when _USE_REDIS is False.
+    if _USE_REDIS:  # noqa: F405 — defined in base.py
+        from sentry_sdk.integrations.redis import RedisIntegration
+        _sentry_integrations.append(RedisIntegration())
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        integrations=[
-            DjangoIntegration(transaction_style="url"),
-            CeleryIntegration(),
-            RedisIntegration(),
-        ],
+        integrations=_sentry_integrations,
         traces_sample_rate=0.1,   # 10% of transactions for performance tracing
         profiles_sample_rate=0.1,
         send_default_pii=False,   # Never send PII to Sentry
@@ -56,48 +67,47 @@ if SENTRY_DSN:
     )
 
 # ============================================================
-# Production Logging - JSON format for log aggregation
+# Production Logging
 # ============================================================
+# Always log to console (stdout) — Render, Railway, Heroku, etc.
+# all capture stdout for log aggregation.
+# Add a rotating file handler only when the log directory exists
+# (e.g. a self-hosted VM with /app/logs/ pre-created).
+_LOG_DIR = "/app/logs"
+_LOG_HANDLERS = ["console"]
+_LOG_HANDLER_CONFIG: dict = {
+    "console": {
+        "class": "logging.StreamHandler",
+        "formatter": "verbose",
+    },
+}
+
+if os.path.isdir(_LOG_DIR):
+    _LOG_HANDLERS.append("file")
+    _LOG_HANDLER_CONFIG["file"] = {
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": f"{_LOG_DIR}/django.log",
+        "maxBytes": 10 * 1024 * 1024,  # 10 MB
+        "backupCount": 5,
+        "formatter": "verbose",
+    }
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "json": {
-            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
-            "format": "%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s",
-        },
         "verbose": {
             "format": "{levelname} {asctime} {module} {message}",
             "style": "{",
         },
     },
-    "filters": {
-        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": "/app/logs/django.log",
-            "maxBytes": 10 * 1024 * 1024,  # 10MB
-            "backupCount": 5,
-            "formatter": "verbose",
-        },
-        "mail_admins": {
-            "level": "ERROR",
-            "class": "django.utils.log.AdminEmailHandler",
-            "filters": ["require_debug_false"],
-        },
-    },
-    "root": {"handlers": ["console", "file"], "level": "WARNING"},
+    "handlers": _LOG_HANDLER_CONFIG,
+    "root": {"handlers": _LOG_HANDLERS, "level": "WARNING"},
     "loggers": {
-        "django": {"handlers": ["console", "file"], "level": "WARNING", "propagate": False},
-        "django.security": {"handlers": ["console", "file"], "level": "ERROR", "propagate": False},
-        "apps": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
-        "celery": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+        "django": {"handlers": _LOG_HANDLERS, "level": "WARNING", "propagate": False},
+        "django.security": {"handlers": _LOG_HANDLERS, "level": "ERROR", "propagate": False},
+        "apps": {"handlers": _LOG_HANDLERS, "level": "INFO", "propagate": False},
+        "celery": {"handlers": _LOG_HANDLERS, "level": "INFO", "propagate": False},
     },
 }
 
