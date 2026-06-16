@@ -144,16 +144,21 @@ def generate_user_insights_task(self, user_id: str):
                 try:
                     import openai as _openai
                     if groq_key:
+                        insight_model = "llama-3.3-70b-versatile"
+                        insight_provider = "groq"
+                        insight_endpoint = "https://api.groq.com/openai/v1"
                         client = _openai.OpenAI(
                             api_key=groq_key,
-                            base_url="https://api.groq.com/openai/v1",
+                            base_url=insight_endpoint,
                         )
-                        insight_model = "llama-3.3-70b-versatile"
                     else:
-                        client = _openai.OpenAI(api_key=openai_key)
                         insight_model = getattr(settings, 'OPENAI_MODEL', 'gpt-4o')
-                prompt = f"""Based on this user's cybersecurity profile, provide personalized recommendations.
-                
+                        insight_provider = "openai"
+                        insight_endpoint = "https://api.openai.com/v1"
+                        client = _openai.OpenAI(api_key=openai_key)
+
+                    prompt = f"""Based on this user's cybersecurity profile, provide personalized recommendations.
+
 User data (last 30 days):
 - Total scans: {total_scans}
 - Threats detected: {threats}
@@ -161,9 +166,13 @@ User data (last 30 days):
 - Most common scam types: {list(categories.keys())[:5]}
 - Risk profile: {risk_profile}
 
-Return JSON with: recommendations (list of 3-5 action items), personalized_tips (list of 3 specific tips), 
+Return JSON with: recommendations (list of 3-5 action items), personalized_tips (list of 3 specific tips),
 narrative (2-3 sentence personalized safety summary)."""
 
+                    logger.info(
+                        "AI insights request | user=%s provider=%s model=%s endpoint=%s",
+                        user_id, insight_provider, insight_model, insight_endpoint,
+                    )
                     response = client.chat.completions.create(
                         model=insight_model,
                         messages=[{"role": "user", "content": prompt}],
@@ -175,8 +184,12 @@ narrative (2-3 sentence personalized safety summary)."""
                     recommendations = result.get("recommendations", [])
                     personalized_tips = result.get("personalized_tips", [])
                     ai_narrative = result.get("narrative", "")
+                    logger.info(
+                        "AI insights complete | user=%s model=%s recommendations=%d",
+                        user_id, insight_model, len(recommendations),
+                    )
                 except Exception as ai_error:
-                    logger.warning(f"AI recommendations skipped for {user_id}: {ai_error}")
+                    logger.warning("AI recommendations skipped | user=%s error=%s", user_id, ai_error)
 
         # Upsert AI insights record
         AIInsight.objects.update_or_create(

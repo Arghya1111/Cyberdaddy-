@@ -135,6 +135,11 @@ class AIAnalysisService:
     (safe/low/medium/high/critical), is_threat (bool), scam_category, summary (max 200 chars), 
     detailed_reasoning, red_flags (list), recommended_action."""
 
+    # Groq endpoint used when GROQ_API_KEY is set
+    _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+    _GROQ_TEXT_MODEL = "llama-3.3-70b-versatile"
+    _GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
     @classmethod
     def _get_client(cls):
         """
@@ -147,12 +152,24 @@ class AIAnalysisService:
         openai_key = getattr(settings, 'OPENAI_API_KEY', '')
 
         if groq_key:
+            provider = "groq"
+            model = cls._GROQ_TEXT_MODEL
+            endpoint = cls._GROQ_BASE_URL
+            logger.info(
+                "AI client initialised | provider=%s model=%s endpoint=%s",
+                provider, model, endpoint,
+            )
             return openai.OpenAI(
                 api_key=groq_key,
-                base_url="https://api.groq.com/openai/v1",
-            ), "llama-3.3-70b-versatile"  # Best Groq model for analysis
+                base_url=endpoint,
+            ), model
         elif openai_key:
-            return openai.OpenAI(api_key=openai_key), getattr(settings, 'OPENAI_MODEL', 'gpt-4o')
+            model = getattr(settings, 'OPENAI_MODEL', 'gpt-4o')
+            logger.info(
+                "AI client initialised | provider=openai model=%s endpoint=https://api.openai.com/v1",
+                model,
+            )
+            return openai.OpenAI(api_key=openai_key), model
         else:
             raise ValueError(
                 "No AI API key configured. Set GROQ_API_KEY or OPENAI_API_KEY "
@@ -172,6 +189,10 @@ class AIAnalysisService:
 
 Return a valid JSON object only, no markdown."""
 
+        logger.info(
+            "AI text analysis request | scan_type=%s model=%s chars=%d",
+            scan_type, model, len(text),
+        )
         try:
             response = client.chat.completions.create(
                 model=model,
@@ -185,9 +206,10 @@ Return a valid JSON object only, no markdown."""
             )
             import json
             result = json.loads(response.choices[0].message.content)
+            logger.info("AI text analysis complete | model=%s scan_type=%s", model, scan_type)
             return result
         except Exception as e:
-            logger.error(f"AI API error during text analysis (model={model}): {e}")
+            logger.error("AI API error during text analysis | model=%s error=%s", model, e)
             raise
 
     @classmethod
@@ -203,15 +225,23 @@ Return a valid JSON object only, no markdown."""
         with open(image_path, "rb") as img_file:
             image_data = base64.b64encode(img_file.read()).decode("utf-8")
 
-        client, model = cls._get_client()
+        client, _text_model = cls._get_client()
         groq_key = getattr(settings, 'GROQ_API_KEY', '')
 
-        # Choose vision model
+        # Choose vision model based on available provider
         if groq_key:
-            vision_model = "meta-llama/llama-4-scout-17b-16e-instruct"  # Groq vision model
+            vision_model = cls._GROQ_VISION_MODEL
+            provider = "groq"
+            endpoint = cls._GROQ_BASE_URL
         else:
-            vision_model = "gpt-4o"  # OpenAI vision
+            vision_model = "gpt-4o"
+            provider = "openai"
+            endpoint = "https://api.openai.com/v1"
 
+        logger.info(
+            "AI vision analysis request | provider=%s model=%s endpoint=%s",
+            provider, vision_model, endpoint,
+        )
         try:
             import json
             response = client.chat.completions.create(
@@ -232,9 +262,10 @@ Return a valid JSON object only, no markdown."""
                 max_tokens=settings.OPENAI_MAX_TOKENS,
                 response_format={"type": "json_object"},
             )
+            logger.info("AI vision analysis complete | model=%s", vision_model)
             return json.loads(response.choices[0].message.content)
         except Exception as e:
-            logger.error(f"AI Vision API error (model={vision_model}): {e}")
+            logger.error("AI Vision API error | model=%s error=%s", vision_model, e)
             raise
 
 
