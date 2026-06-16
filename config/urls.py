@@ -13,6 +13,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from apps.core.views import HealthCheckView
 
 # ============================================================
 # API v1 URL patterns
@@ -55,6 +56,11 @@ urlpatterns = [
 
     # Admin site
     path("admin/", admin.site.urls),
+
+    # Health check — registered at both paths:
+    #   /api/health/      ← used by external monitors, Render health checks, etc.
+    #   /api/v1/health/   ← canonical versioned path (via api_v1_patterns below)
+    path("api/health/", HealthCheckView.as_view(), name="health-check-unversioned"),
 
     # API v1
     path("api/v1/", include(api_v1_patterns)),
