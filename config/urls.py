@@ -37,8 +37,8 @@ api_v1_patterns = [
     # Subscriptions
     path("subscriptions/", include("apps.subscriptions.urls", namespace="subscriptions")),
 
-    # Payments
-    path("payments/", include("apps.payments.urls", namespace="payments")),
+    # Payments — temporarily disabled while stripe/razorpay deps are resolved
+    # path("payments/", include("apps.payments.urls", namespace="payments")),
 
     # Notifications
     path("notifications/", include("apps.notifications.urls", namespace="notifications")),

@@ -10,7 +10,9 @@ from rest_framework import status, generics
 from drf_spectacular.utils import extend_schema
 
 from .models import Payment
-from .services import StripeService, RazorpayService, PaymentService
+# StripeService / RazorpayService / PaymentService imports moved inline
+# (top-level import disabled to prevent stripe/razorpay loading on boot)
+# from .services import StripeService, RazorpayService, PaymentService
 from apps.core.pagination import StandardResultsSetPagination
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ class CreateStripeSubscriptionView(APIView):
             )
 
         try:
+            from .services import StripeService
             svc = StripeService()
             result = svc.create_subscription(request.user, plan, billing_cycle)
             return Response({"success": True, **result})
@@ -67,6 +70,7 @@ class CreateRazorpayOrderView(APIView):
             )
 
         try:
+            from .services import RazorpayService
             svc = RazorpayService()
             order = svc.create_order(
                 amount_inr=amount,
@@ -102,6 +106,7 @@ class VerifyRazorpayPaymentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        from .services import RazorpayService, PaymentService
         svc = RazorpayService()
         if not svc.verify_payment(order_id, payment_id, signature):
             return Response(
@@ -132,6 +137,7 @@ class StripeWebhookView(APIView):
     def post(self, request):
         sig_header = request.headers.get("Stripe-Signature", "")
         try:
+            from .services import StripeService
             svc = StripeService()
             event = svc.handle_webhook(request.body, sig_header)
             # Handle specific events
@@ -158,6 +164,7 @@ class RazorpayWebhookView(APIView):
     def post(self, request):
         signature = request.headers.get("X-Razorpay-Signature", "")
         try:
+            from .services import RazorpayService
             svc = RazorpayService()
             payload = svc.handle_webhook(request.body, signature)
             from apps.payments.tasks import handle_razorpay_webhook_task

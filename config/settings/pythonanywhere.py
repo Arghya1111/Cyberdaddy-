@@ -65,7 +65,7 @@ LOCAL_APPS = [
     "apps.scam_detection",
     "apps.threat_intelligence",
     "apps.subscriptions",
-    "apps.payments",
+    # "apps.payments",  # temporarily disabled — stripe/razorpay not configured
     "apps.notifications",
     "apps.ai_insights",
     "apps.core",

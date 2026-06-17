@@ -4,8 +4,10 @@ Handles Stripe and Razorpay payment flows.
 """
 
 import logging
-import stripe
-import razorpay
+# stripe and razorpay are imported lazily inside each method so the backend
+# can boot without these packages being installed or configured.
+# import stripe
+# import razorpay
 from django.conf import settings
 from django.utils import timezone
 
@@ -16,7 +18,9 @@ class StripeService:
     """Stripe payment gateway integration."""
 
     def __init__(self):
+        import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
+        self._stripe = stripe
 
     def create_subscription(self, user, plan: str, billing_cycle: str) -> dict:
         """Create a Stripe subscription for the user."""
@@ -43,7 +47,7 @@ class StripeService:
         if subscription.stripe_customer_id:
             customer_id = subscription.stripe_customer_id
         else:
-            customer = stripe.Customer.create(
+            customer = self._stripe.Customer.create(
                 email=user.email,
                 name=user.full_name,
                 metadata={"cyberdaddy_user_id": str(user.id)},
@@ -53,7 +57,7 @@ class StripeService:
             subscription.save(update_fields=["stripe_customer_id"])
 
         # Create Stripe subscription
-        stripe_sub = stripe.Subscription.create(
+        stripe_sub = self._stripe.Subscription.create(
             customer=customer_id,
             items=[{"price": price_id}],
             payment_behavior="default_incomplete",
@@ -70,11 +74,12 @@ class StripeService:
 
     def handle_webhook(self, payload: bytes, sig_header: str) -> dict:
         """Verify and process Stripe webhook events."""
+        import stripe as _stripe
         try:
-            event = stripe.Webhook.construct_event(
+            event = _stripe.Webhook.construct_event(
                 payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
             )
-        except stripe.error.SignatureVerificationError as e:
+        except _stripe.error.SignatureVerificationError as e:
             logger.warning(f"Stripe webhook signature verification failed: {e}")
             raise ValueError("Invalid webhook signature")
 
@@ -85,9 +90,11 @@ class RazorpayService:
     """Razorpay payment gateway integration (primary for India)."""
 
     def __init__(self):
+        import razorpay
         self.client = razorpay.Client(
             auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
         )
+        self._razorpay = razorpay
 
     def create_order(self, amount_inr: float, currency: str = "INR", notes: dict = None) -> dict:
         """Create a Razorpay order for one-time or subscription payment."""
@@ -109,7 +116,7 @@ class RazorpayService:
                 "razorpay_signature": signature,
             })
             return True
-        except razorpay.errors.SignatureVerificationError:
+        except self._razorpay.errors.SignatureVerificationError:
             return False
 
     def handle_webhook(self, payload: bytes, signature: str) -> dict:
