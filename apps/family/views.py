@@ -239,47 +239,54 @@ class FamilyDashboardView(APIView):
         from django.utils import timezone
         from datetime import timedelta
 
-        user = request.user
-        if hasattr(user, "managed_family_group"):
-            group = user.managed_family_group
-        elif hasattr(user, "family_membership"):
-            group = user.family_membership.family_group
-        else:
-            return Response(
-                {"success": False, "error": {"message": "You are not in a family group."}},
-                status=status.HTTP_400_BAD_REQUEST
+        try:
+            user = request.user
+            if hasattr(user, "managed_family_group"):
+                group = user.managed_family_group
+            elif hasattr(user, "family_membership"):
+                group = user.family_membership.family_group
+            else:
+                return Response(
+                    {"success": False, "error": {"message": "You are not in a family group."}},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            cache_key = f"family_dashboard_{group.id}"
+            dashboard = cache.get(cache_key)
+
+            if not dashboard:
+                members = group.members.filter(is_active=True).select_related("user")
+                member_ids = members.values_list("user_id", flat=True)
+
+                this_month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0)
+                recent_scans = ScanHistory.objects.filter(
+                    user__in=member_ids,
+                    created_at__gte=this_month_start,
+                    status=ScanHistory.ScanStatus.COMPLETED,
+                )
+
+                dashboard = {
+                    "group": FamilyGroupSerializer(group).data,
+                    "member_count": members.count(),
+                    "total_scans_this_month": recent_scans.count(),
+                    "threats_this_month": recent_scans.filter(is_threat=True).count(),
+                    "average_safety_score": float(group.average_safety_score),
+                    "member_safety_scores": [
+                        {
+                            "member_id": str(m.id),
+                            "name": m.user.full_name,
+                            "role": m.role,
+                            "safety_score": float(m.user.safety_score),
+                        }
+                        for m in members
+                    ],
+                }
+                cache.set(cache_key, dashboard, timeout=600)
+
+            return Response(dashboard)
+
+        except Exception as e:
+            logger.error(
+                f"Family Dashboard Error | user={request.user.id} | error={str(e)}"
             )
-
-        cache_key = f"family_dashboard_{group.id}"
-        dashboard = cache.get(cache_key)
-
-        if not dashboard:
-            members = group.members.filter(is_active=True).select_related("user")
-            member_ids = members.values_list("user_id", flat=True)
-
-            this_month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0)
-            recent_scans = ScanHistory.objects.filter(
-                user__in=member_ids,
-                created_at__gte=this_month_start,
-                status=ScanHistory.ScanStatus.COMPLETED,
-            )
-
-            dashboard = {
-                "group": FamilyGroupSerializer(group).data,
-                "member_count": members.count(),
-                "total_scans_this_month": recent_scans.count(),
-                "threats_this_month": recent_scans.filter(is_threat=True).count(),
-                "average_safety_score": float(group.average_safety_score),
-                "member_safety_scores": [
-                    {
-                        "member_id": str(m.id),
-                        "name": m.user.full_name,
-                        "role": m.role,
-                        "safety_score": float(m.user.safety_score),
-                    }
-                    for m in members
-                ],
-            }
-            cache.set(cache_key, dashboard, timeout=600)
-
-        return Response(dashboard)
+            raise
