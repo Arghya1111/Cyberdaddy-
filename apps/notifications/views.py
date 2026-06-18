@@ -7,10 +7,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
 
 from .models import Notification
 from apps.core.pagination import StandardResultsSetPagination
+from apps.core.serializers import MessageSerializer, ErrorResponseSerializer
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -32,6 +33,9 @@ class NotificationListView(generics.ListAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Notification.objects.none()
+
         return Notification.objects.filter(
             user=self.request.user
         ).order_by("-created_at")
@@ -45,7 +49,12 @@ class MarkNotificationReadView(APIView):
     """POST /api/v1/notifications/<id>/read/ — Mark notification as read."""
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Notifications"], summary="Mark notification as read")
+    @extend_schema(
+        tags=["Notifications"],
+        summary="Mark notification as read",
+        request=None,
+        responses={200: MessageSerializer, 404: ErrorResponseSerializer},
+    )
     def post(self, request, pk):
         try:
             notification = Notification.objects.get(id=pk, user=request.user)
@@ -62,7 +71,20 @@ class MarkAllNotificationsReadView(APIView):
     """POST /api/v1/notifications/read-all/ — Mark all notifications as read."""
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Notifications"], summary="Mark all notifications as read")
+    @extend_schema(
+        tags=["Notifications"],
+        summary="Mark all notifications as read",
+        request=None,
+        responses={
+            200: inline_serializer(
+                name="MarkAllReadResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "marked_read": serializers.IntegerField(),
+                },
+            )
+        },
+    )
     def post(self, request):
         from django.utils import timezone
         count = Notification.objects.filter(
@@ -80,7 +102,16 @@ class UnreadCountView(APIView):
     """GET /api/v1/notifications/unread-count/ — Unread notification badge count."""
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Notifications"], summary="Get unread notification count")
+    @extend_schema(
+        tags=["Notifications"],
+        summary="Get unread notification count",
+        responses={
+            200: inline_serializer(
+                name="UnreadCountResponse",
+                fields={"unread_count": serializers.IntegerField()},
+            )
+        },
+    )
     def get(self, request):
         count = Notification.objects.filter(
             user=request.user,

@@ -14,7 +14,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serializer
+from rest_framework import serializers
 
 from .models import User, UserSession
 from .serializers import (
@@ -30,9 +31,11 @@ from .serializers import (
     PhoneOTPVerifySerializer,
     SocialLoginSerializer,
     UserSessionSerializer,
+    LogoutSerializer,
 )
 from .services import UserService, AuthService, SessionService
 from apps.core.exceptions import CyberDaddyAPIError
+from apps.core.serializers import MessageSerializer, ErrorResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +65,20 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["Auth"], summary="Register new user account")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Register new user account",
+        responses={
+            201: inline_serializer(
+                name="RegisterResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                    "user_id": serializers.UUIDField(),
+                },
+            )
+        },
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -84,7 +100,12 @@ class LogoutView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Auth"], summary="Logout current session")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Logout current session",
+        request=LogoutSerializer,
+        responses={200: MessageSerializer},
+    )
     def post(self, request):
         try:
             refresh_token = request.data.get("refresh_token")
@@ -107,9 +128,13 @@ class LogoutAllView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Auth"], summary="Logout all other devices")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Logout all other devices",
+        request=None,
+        responses={200: MessageSerializer},
+    )
     def post(self, request):
-        # Extract JTI from current request's token
         current_jti = request.auth.payload.get("jti") if request.auth else None
         count = SessionService.logout_all_sessions(request.user, except_jti=current_jti)
         return Response({
@@ -125,7 +150,12 @@ class VerifyEmailView(APIView):
     """
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["Auth"], summary="Verify user email address")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Verify user email address",
+        request=EmailVerificationSerializer,
+        responses={200: MessageSerializer, 400: ErrorResponseSerializer},
+    )
     def post(self, request):
         serializer = EmailVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -146,7 +176,12 @@ class ResendVerificationEmailView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Auth"], summary="Resend email verification")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Resend email verification",
+        request=None,
+        responses={200: MessageSerializer, 400: ErrorResponseSerializer},
+    )
     def post(self, request):
         if request.user.is_email_verified:
             return Response(
@@ -171,7 +206,12 @@ class RequestPasswordResetView(APIView):
     """
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["Auth"], summary="Request password reset email")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Request password reset email",
+        request=RequestPasswordResetSerializer,
+        responses={200: MessageSerializer},
+    )
     def post(self, request):
         serializer = RequestPasswordResetSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -190,7 +230,12 @@ class ConfirmPasswordResetView(APIView):
     """
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["Auth"], summary="Reset password with token")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Reset password with token",
+        request=ConfirmPasswordResetSerializer,
+        responses={200: MessageSerializer, 400: ErrorResponseSerializer},
+    )
     def post(self, request):
         serializer = ConfirmPasswordResetSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -214,14 +259,18 @@ class PhoneOTPRequestView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Auth"], summary="Request phone OTP")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Request phone OTP",
+        request=PhoneOTPRequestSerializer,
+        responses={200: MessageSerializer},
+    )
     def post(self, request):
         serializer = PhoneOTPRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         otp = AuthService.generate_otp(
             serializer.validated_data["phone_number"], request.user
         )
-        # Send OTP via SMS task
         from apps.notifications.tasks import send_sms_task
         sms_message = f"Your CyberDaddy OTP is: {otp}. Valid for {settings.OTP_EXPIRY_MINUTES} minutes."
         if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
@@ -241,7 +290,12 @@ class PhoneOTPVerifyView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Auth"], summary="Verify phone OTP")
+    @extend_schema(
+        tags=["Auth"],
+        summary="Verify phone OTP",
+        request=PhoneOTPVerifySerializer,
+        responses={200: MessageSerializer, 400: ErrorResponseSerializer},
+    )
     def post(self, request):
         serializer = PhoneOTPVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -299,7 +353,12 @@ class ChangePasswordView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Users"], summary="Change user password")
+    @extend_schema(
+        tags=["Users"],
+        summary="Change user password",
+        request=ChangePasswordSerializer,
+        responses={200: MessageSerializer, 400: ErrorResponseSerializer},
+    )
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -323,9 +382,15 @@ class UserSessionListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserSessionSerializer
 
-    @extend_schema(tags=["Users"], summary="List active sessions")
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return UserSession.objects.none()
+
         return SessionService.get_active_sessions(self.request.user)
+
+    @extend_schema(tags=["Users"], summary="List active sessions")
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
 
 class RevokeSessionView(APIView):
@@ -335,7 +400,11 @@ class RevokeSessionView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Users"], summary="Revoke a device session")
+    @extend_schema(
+        tags=["Users"],
+        summary="Revoke a device session",
+        responses={200: MessageSerializer, 404: ErrorResponseSerializer},
+    )
     def delete(self, request, session_id):
         success = SessionService.logout_session(request.user, session_id)
         if success:

@@ -318,7 +318,53 @@ SPECTACULAR_SETTINGS = {
         {"name": "Payments", "description": "Payment Processing"},
         {"name": "Notifications", "description": "Notification Management"},
         {"name": "Insights", "description": "AI Insights & Analytics"},
+        {"name": "Health", "description": "Service Health Checks"},
     ],
+    # Prevent collisions from multiple `status` fields with overlapping choices.
+    # Each entry maps a stable schema enum name → its exhaustive list of values.
+    "ENUM_NAME_OVERRIDES": {
+        # ScanHistory enums — must match model TextChoices values exactly
+        "ScanStatusEnum": [
+            "pending", "processing", "completed", "failed",
+        ],
+        "ScanHistoryTypeEnum": [
+            "screenshot", "sms", "url", "email", "phone_number",
+        ],
+        "RiskLevelEnum": [
+            "safe", "low", "medium", "high", "critical",
+        ],
+        # SubmitTextScanSerializer uses 4 scan types (no screenshot for text-based)
+        "ScanTypeInputEnum": [
+            "sms", "url", "email", "phone_number",
+        ],
+        "SubscriptionStatusEnum": [
+            "active", "trial", "past_due", "cancelled", "expired", "paused",
+        ],
+        "NotificationStatusEnum": [
+            "pending", "sent", "delivered", "failed", "read",
+        ],
+        "NotificationPriorityEnum": [
+            "low", "normal", "high", "critical",
+        ],
+        "NotificationTypeEnum": [
+            "threat_alert", "scan_complete", "family_alert", "weekly_report",
+            "subscription", "payment", "system", "welcome",
+        ],
+        "FamilyGroupStatusEnum": [
+            "active", "suspended",
+        ],
+        "MemberRoleEnum": [
+            "parent", "guardian", "child", "elderly", "member",
+        ],
+        "UserAccountStatusEnum": [
+            "active", "inactive", "suspended", "pending_verification",
+        ],
+        "UserAccountTypeEnum": [
+            "individual", "family_admin", "family_member", "enterprise",
+        ],
+    },
+    # Suppress noisy warnings about views that intentionally return varied shapes.
+    "COMPONENT_SPLIT_REQUEST": False,
 }
 
 # ============================================================

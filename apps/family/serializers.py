@@ -57,10 +57,18 @@ class UpdateMemberRoleSerializer(serializers.ModelSerializer):
         fields = ["role", "can_be_monitored", "alert_parent_on_threat", "permissions"]
 
 
+class MemberSafetyScoreSerializer(serializers.Serializer):
+    member_id = serializers.UUIDField()
+    name = serializers.CharField()
+    role = serializers.CharField()
+    safety_score = serializers.FloatField()
+
+
 class FamilyDashboardSerializer(serializers.Serializer):
-    """Aggregated family dashboard data."""
+    """Aggregated family safety dashboard — matches GET /api/v1/family/dashboard/ response."""
     group = FamilyGroupSerializer()
-    member_safety_scores = serializers.ListField()
-    recent_threats = serializers.ListField()
+    member_count = serializers.IntegerField()
     total_scans_this_month = serializers.IntegerField()
-    threats_blocked_this_month = serializers.IntegerField()
+    threats_this_month = serializers.IntegerField()
+    average_safety_score = serializers.FloatField()
+    member_safety_scores = MemberSafetyScoreSerializer(many=True)

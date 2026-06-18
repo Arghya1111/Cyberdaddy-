@@ -160,6 +160,13 @@ class SocialLoginSerializer(serializers.Serializer):
     device_id = serializers.CharField(required=False, default="")
 
 
+class LogoutSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField(
+        required=False, allow_blank=True,
+        help_text="JWT refresh token to blacklist. Optional — session is logged out regardless."
+    )
+
+
 # ============================================================
 # Session Serializers
 # ============================================================

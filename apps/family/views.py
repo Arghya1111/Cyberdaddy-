@@ -7,16 +7,18 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 
 from .models import FamilyGroup, FamilyMember
 from .serializers import (
     FamilyGroupSerializer, FamilyGroupCreateSerializer,
     FamilyMemberSerializer, JoinFamilySerializer,
-    UpdateMemberRoleSerializer,
+    UpdateMemberRoleSerializer, FamilyDashboardSerializer,
 )
 from apps.core.permissions import IsFamilyAdmin, HasFamilyPlan, IsEmailVerified
 from apps.core.exceptions import FamilyLimitExceededError
+from apps.core.serializers import MessageSerializer, ErrorResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,12 @@ class CreateFamilyGroupView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasFamilyPlan]
     serializer_class = FamilyGroupCreateSerializer
 
-    @extend_schema(tags=["Family"], summary="Create family group")
+    @extend_schema(
+        tags=["Family"],
+        summary="Create family group",
+        request=FamilyGroupCreateSerializer,
+        responses={201: FamilyGroupSerializer, 400: ErrorResponseSerializer},
+    )
     def create(self, request, *args, **kwargs):
         # Check if user already has a group
         if hasattr(request.user, "managed_family_group"):
@@ -73,7 +80,11 @@ class FamilyGroupDetailView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user.managed_family_group
 
-    @extend_schema(tags=["Family"], summary="Get/Update family group")
+    @extend_schema(
+        tags=["Family"],
+        summary="Get/Update family group",
+        responses={200: FamilyGroupSerializer},
+    )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -85,7 +96,22 @@ class JoinFamilyGroupView(APIView):
     """
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
-    @extend_schema(tags=["Family"], summary="Join family with invite code")
+    @extend_schema(
+        tags=["Family"],
+        summary="Join family with invite code",
+        request=JoinFamilySerializer,
+        responses={
+            201: inline_serializer(
+                name="JoinFamilyResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                    "member": FamilyMemberSerializer(),
+                },
+            ),
+            400: ErrorResponseSerializer,
+        },
+    )
     def post(self, request):
         serializer = JoinFamilySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -143,6 +169,9 @@ class FamilyMembersListView(generics.ListAPIView):
     serializer_class = FamilyMemberSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return FamilyMember.objects.none()
+
         if hasattr(self.request.user, "managed_family_group"):
             group = self.request.user.managed_family_group
         elif hasattr(self.request.user, "family_membership"):
@@ -168,6 +197,9 @@ class UpdateMemberRoleView(generics.UpdateAPIView):
     serializer_class = UpdateMemberRoleSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return FamilyMember.objects.none()
+
         return FamilyMember.objects.filter(
             family_group=self.request.user.managed_family_group
         )
@@ -184,7 +216,11 @@ class RemoveMemberView(APIView):
     """
     permission_classes = [IsAuthenticated, IsFamilyAdmin]
 
-    @extend_schema(tags=["Family"], summary="Remove family member")
+    @extend_schema(
+        tags=["Family"],
+        summary="Remove family member",
+        responses={200: MessageSerializer, 400: ErrorResponseSerializer},
+    )
     def delete(self, request, pk):
         try:
             member = FamilyMember.objects.get(
@@ -214,7 +250,21 @@ class RegenerateInviteCodeView(APIView):
     """
     permission_classes = [IsAuthenticated, IsFamilyAdmin]
 
-    @extend_schema(tags=["Family"], summary="Regenerate invite code")
+    @extend_schema(
+        tags=["Family"],
+        summary="Regenerate invite code",
+        request=None,
+        responses={
+            200: inline_serializer(
+                name="RegenerateInviteCodeResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "invite_code": serializers.CharField(),
+                    "expires_at": serializers.DateTimeField(),
+                },
+            )
+        },
+    )
     def post(self, request):
         group = request.user.managed_family_group
         group.refresh_invite_code()
@@ -232,7 +282,11 @@ class FamilyDashboardView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Family"], summary="Family safety dashboard")
+    @extend_schema(
+        tags=["Family"],
+        summary="Family safety dashboard",
+        responses={200: FamilyDashboardSerializer, 400: ErrorResponseSerializer},
+    )
     def get(self, request):
         from django.core.cache import cache
         from apps.scam_detection.models import ScanHistory

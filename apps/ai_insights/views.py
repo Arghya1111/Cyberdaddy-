@@ -6,7 +6,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
+from drf_spectacular.openapi import OpenApiTypes
 from django.core.cache import cache
 
 from .models import AIInsight
@@ -37,7 +38,11 @@ class AIInsightDashboardView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Insights"], summary="Get AI safety insights dashboard")
+    @extend_schema(
+        tags=["Insights"],
+        summary="Get AI safety insights dashboard",
+        responses={200: AIInsightSerializer},
+    )
     def get(self, request):
         cache_key = f"ai_insights_{request.user.id}"
         data = cache.get(cache_key)
@@ -60,7 +65,20 @@ class SafetyScoreView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Insights"], summary="Get current safety score")
+    @extend_schema(
+        tags=["Insights"],
+        summary="Get current safety score",
+        responses={
+            200: inline_serializer(
+                name="SafetyScoreResponse",
+                fields={
+                    "safety_score": serializers.FloatField(),
+                    "risk_profile": serializers.CharField(),
+                    "safety_score_trend": serializers.CharField(required=False),
+                },
+            )
+        },
+    )
     def get(self, request):
         cache_key = f"safety_score_{request.user.id}"
         score_data = cache.get(cache_key)
@@ -90,7 +108,21 @@ class ThreatTrendsView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Insights"], summary="Get scam threat trends")
+    @extend_schema(
+        tags=["Insights"],
+        summary="Get scam threat trends",
+        responses={
+            200: inline_serializer(
+                name="ThreatTrendsResponse",
+                fields={
+                    "weekly_scan_trend": serializers.ListField(child=serializers.DictField()),
+                    "monthly_safety_trend": serializers.ListField(child=serializers.DictField()),
+                    "scam_categories_breakdown": serializers.DictField(),
+                    "top_scam_categories": serializers.ListField(child=serializers.CharField()),
+                },
+            )
+        },
+    )
     def get(self, request):
         try:
             insight = request.user.ai_insights
@@ -116,7 +148,21 @@ class RecommendationsView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Insights"], summary="Get personalized recommendations")
+    @extend_schema(
+        tags=["Insights"],
+        summary="Get personalized recommendations",
+        responses={
+            200: inline_serializer(
+                name="RecommendationsResponse",
+                fields={
+                    "recommendations": serializers.ListField(child=serializers.CharField()),
+                    "personalized_tips": serializers.ListField(child=serializers.CharField()),
+                    "ai_narrative": serializers.CharField(allow_blank=True),
+                    "last_analyzed_at": serializers.DateTimeField(allow_null=True),
+                },
+            )
+        },
+    )
     def get(self, request):
         try:
             insight = request.user.ai_insights

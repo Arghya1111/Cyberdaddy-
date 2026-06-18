@@ -6,8 +6,9 @@ from rest_framework import generics, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework import serializers
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
 from django.core.cache import cache
 
 from .models import ThreatDatabase
@@ -57,7 +58,20 @@ class ThreatSearchView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Threats"], summary="Search threat database")
+    @extend_schema(
+        tags=["Threats"],
+        summary="Search threat database",
+        request=ThreatSearchSerializer,
+        responses={
+            200: inline_serializer(
+                name="ThreatSearchResponse",
+                fields={
+                    "results": ThreatDatabaseListSerializer(many=True),
+                    "count": serializers.IntegerField(),
+                },
+            )
+        },
+    )
     def post(self, request):
         serializer = ThreatSearchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -92,7 +106,21 @@ class ThreatStatsView(APIView):
     """GET /api/v1/threats/stats/ - Threat category statistics for dashboard."""
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Threats"], summary="Threat statistics")
+    @extend_schema(
+        tags=["Threats"],
+        summary="Threat statistics",
+        responses={
+            200: inline_serializer(
+                name="ThreatStatsResponse",
+                fields={
+                    "total_active_threats": serializers.IntegerField(),
+                    "by_category": serializers.ListField(child=serializers.DictField()),
+                    "by_severity": serializers.ListField(child=serializers.DictField()),
+                    "most_reported": serializers.ListField(child=serializers.DictField()),
+                },
+            )
+        },
+    )
     def get(self, request):
         from django.db.models import Count
         cache_key = "threat_stats"

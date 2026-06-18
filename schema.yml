@@ -1,0 +1,3336 @@
+openapi: 3.0.3
+info:
+  title: CyberDaddy API
+  version: 1.0.0
+  description: AI-powered Family Cybersecurity SaaS Platform
+  contact:
+    email: dev@cyberdaddy.in
+  license:
+    name: Proprietary
+paths:
+  /api/health/:
+    get:
+      operationId: health_retrieve
+      description: |-
+        Health check endpoint for load balancers, K8s probes, and Docker HEALTHCHECK.
+        Returns 200 OK if all critical services are reachable.
+      summary: Service health check
+      tags:
+      - Health
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+          description: ''
+  /api/v1/family/create/:
+    post:
+      operationId: v1_family_create_create
+      description: |-
+        POST /api/v1/family/create/
+        Create a new family group. User becomes the admin.
+        Requires Family Plan subscription.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyGroupCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FamilyGroupCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FamilyGroupCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyGroupCreate'
+          description: ''
+  /api/v1/family/dashboard/:
+    get:
+      operationId: v1_family_dashboard_retrieve
+      description: |-
+        GET /api/v1/family/dashboard/
+        Aggregated family safety dashboard with member stats.
+      summary: Family safety dashboard
+      tags:
+      - Family
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyDashboard'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/family/group/:
+    get:
+      operationId: v1_family_group_retrieve
+      description: |-
+        GET  /api/v1/family/group/    → Get family group details
+        PATCH /api/v1/family/group/   → Update group name/description (admin only)
+      summary: Get/Update family group
+      tags:
+      - Family
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyGroup'
+          description: ''
+    put:
+      operationId: v1_family_group_update
+      description: |-
+        GET  /api/v1/family/group/    → Get family group details
+        PATCH /api/v1/family/group/   → Update group name/description (admin only)
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyGroup'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FamilyGroup'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FamilyGroup'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyGroup'
+          description: ''
+    patch:
+      operationId: v1_family_group_partial_update
+      description: |-
+        GET  /api/v1/family/group/    → Get family group details
+        PATCH /api/v1/family/group/   → Update group name/description (admin only)
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFamilyGroup'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFamilyGroup'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFamilyGroup'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyGroup'
+          description: ''
+  /api/v1/family/invite/regenerate/:
+    post:
+      operationId: v1_family_invite_regenerate_create
+      description: |-
+        POST /api/v1/family/invite/regenerate/
+        Generate a new invite code (invalidates the old one).
+      summary: Regenerate invite code
+      tags:
+      - Family
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegenerateInviteCodeResponse'
+          description: ''
+  /api/v1/family/join/:
+    post:
+      operationId: v1_family_join_create
+      description: |-
+        POST /api/v1/family/join/
+        Join a family group using an invite code.
+      summary: Join family with invite code
+      tags:
+      - Family
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinFamily'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JoinFamily'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JoinFamily'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinFamilyResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/family/members/:
+    get:
+      operationId: v1_family_members_list
+      description: |-
+        GET /api/v1/family/members/
+        List all members of the user's family group.
+      summary: List family members
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Family
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFamilyMemberList'
+          description: ''
+  /api/v1/family/members/{id}/:
+    put:
+      operationId: v1_family_members_update
+      description: |-
+        PATCH /api/v1/family/members/<member_id>/
+        Update a family member's role or monitoring settings (admin only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRole'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRole'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRole'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateMemberRole'
+          description: ''
+    patch:
+      operationId: v1_family_members_partial_update
+      description: |-
+        PATCH /api/v1/family/members/<member_id>/
+        Update a family member's role or monitoring settings (admin only).
+      summary: Update member role
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Family
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMemberRole'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMemberRole'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateMemberRole'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateMemberRole'
+          description: ''
+  /api/v1/family/members/{id}/remove/:
+    delete:
+      operationId: v1_family_members_remove_destroy
+      description: |-
+        DELETE /api/v1/family/members/<member_id>/remove/
+        Remove a member from the family group (admin only).
+      summary: Remove family member
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Family
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/health/:
+    get:
+      operationId: v1_health_retrieve
+      description: |-
+        Health check endpoint for load balancers, K8s probes, and Docker HEALTHCHECK.
+        Returns 200 OK if all critical services are reachable.
+      summary: Service health check
+      tags:
+      - Health
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+          description: ''
+  /api/v1/insights/dashboard/:
+    get:
+      operationId: v1_insights_dashboard_retrieve
+      description: |-
+        GET /api/v1/insights/dashboard/
+        Returns full AI safety dashboard for the current user.
+        Cached for 30 minutes.
+      summary: Get AI safety insights dashboard
+      tags:
+      - Insights
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIInsight'
+          description: ''
+  /api/v1/insights/recommendations/:
+    get:
+      operationId: v1_insights_recommendations_retrieve
+      description: |-
+        GET /api/v1/insights/recommendations/
+        Returns personalized AI safety recommendations.
+      summary: Get personalized recommendations
+      tags:
+      - Insights
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationsResponse'
+          description: ''
+  /api/v1/insights/safety-score/:
+    get:
+      operationId: v1_insights_safety_score_retrieve
+      description: |-
+        GET /api/v1/insights/safety-score/
+        Returns just the current safety score (lightweight, frequently polled).
+      summary: Get current safety score
+      tags:
+      - Insights
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SafetyScoreResponse'
+          description: ''
+  /api/v1/insights/trends/:
+    get:
+      operationId: v1_insights_trends_retrieve
+      description: |-
+        GET /api/v1/insights/trends/
+        Returns scam trend data for chart visualization.
+      summary: Get scam threat trends
+      tags:
+      - Insights
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatTrendsResponse'
+          description: ''
+  /api/v1/notifications/:
+    get:
+      operationId: v1_notifications_list
+      description: GET /api/v1/notifications/ — List all notifications for current
+        user.
+      summary: List user notifications
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /api/v1/notifications/{id}/read/:
+    post:
+      operationId: v1_notifications_read_create
+      description: POST /api/v1/notifications/<id>/read/ — Mark notification as read.
+      summary: Mark notification as read
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/notifications/read-all/:
+    post:
+      operationId: v1_notifications_read_all_create
+      description: POST /api/v1/notifications/read-all/ — Mark all notifications as
+        read.
+      summary: Mark all notifications as read
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAllReadResponse'
+          description: ''
+  /api/v1/notifications/unread-count/:
+    get:
+      operationId: v1_notifications_unread_count_retrieve
+      description: GET /api/v1/notifications/unread-count/ — Unread notification badge
+        count.
+      summary: Get unread notification count
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCountResponse'
+          description: ''
+  /api/v1/scans/{id}/:
+    get:
+      operationId: v1_scans_retrieve
+      description: |-
+        GET /api/v1/scans/<scan_id>/
+        Retrieve a specific scan result with AI analysis and threat matches.
+      summary: Get scan result
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Scans
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanHistory'
+          description: ''
+  /api/v1/scans/history/:
+    get:
+      operationId: v1_scans_history_list
+      description: |-
+        GET /api/v1/scans/history/
+        List all scans for the current user with filtering.
+      summary: List scan history
+      parameters:
+      - in: query
+        name: is_threat
+        schema:
+          type: boolean
+        description: Filter by threat flag
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: risk_level
+        schema:
+          type: string
+          enum:
+          - critical
+          - high
+          - low
+          - medium
+          - safe
+        description: Filter by risk level
+      - in: query
+        name: scan_type
+        schema:
+          type: string
+          enum:
+          - email
+          - phone_number
+          - screenshot
+          - sms
+          - url
+        description: Filter by scan type
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - completed
+          - failed
+          - pending
+          - processing
+        description: Filter by scan status
+      tags:
+      - Scans
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedScanHistoryListList'
+          description: ''
+  /api/v1/scans/screenshot/:
+    post:
+      operationId: v1_scans_screenshot_create
+      description: |-
+        POST /api/v1/scans/screenshot/
+        Upload a screenshot for AI scam detection (GPT-4o Vision).
+      summary: Submit screenshot scan
+      tags:
+      - Scans
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubmitScreenshotScan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanSubmitResponse'
+          description: ''
+  /api/v1/scans/stats/:
+    get:
+      operationId: v1_scans_stats_retrieve
+      description: |-
+        GET /api/v1/scans/stats/
+        Returns scan statistics for the current user's dashboard.
+      summary: Get scan statistics
+      tags:
+      - Scans
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanStatsResponse'
+          description: ''
+  /api/v1/scans/text/:
+    post:
+      operationId: v1_scans_text_create
+      description: |-
+        POST /api/v1/scans/text/
+        Submit a text-based scan (SMS, URL, Email, Phone Number).
+        Returns immediately with scan ID; result fetched via GET /scans/<id>/
+      summary: Submit text scan (SMS/URL/Email)
+      tags:
+      - Scans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTextScan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubmitTextScan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubmitTextScan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanSubmitResponse'
+          description: ''
+  /api/v1/subscriptions/cancel/:
+    post:
+      operationId: v1_subscriptions_cancel_create
+      description: |-
+        POST /api/v1/subscriptions/cancel/
+        Cancel subscription at end of current billing period.
+      summary: Cancel subscription
+      tags:
+      - Subscriptions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelSubscriptionResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/subscriptions/me/:
+    get:
+      operationId: v1_subscriptions_me_retrieve
+      description: |-
+        GET /api/v1/subscriptions/me/
+        Returns current user's subscription details and plan limits.
+      summary: Get current subscription
+      tags:
+      - Subscriptions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+          description: ''
+  /api/v1/subscriptions/plans/:
+    get:
+      operationId: v1_subscriptions_plans_retrieve
+      description: |-
+        GET /api/v1/subscriptions/plans/
+        Returns all available subscription plans with pricing.
+        Public endpoint — no authentication required.
+      summary: List available plans
+      tags:
+      - Subscriptions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlansListResponse'
+          description: ''
+  /api/v1/threats/:
+    get:
+      operationId: v1_threats_list
+      description: |-
+        GET /api/v1/threats/
+        List all active threats with filtering by category and severity.
+        Results are cached for 1 hour.
+      summary: List threat intelligence database
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+          enum:
+          - cryptocurrency
+          - fake_ecommerce
+          - financial_fraud
+          - impersonation
+          - job_scam
+          - lottery_scam
+          - malware
+          - other
+          - phishing
+          - romance_scam
+          - social_engineering
+          - tech_support
+          - upi_fraud
+        description: |-
+          * `phishing` - Phishing
+          * `financial_fraud` - Financial / Investment Fraud
+          * `lottery_scam` - Lottery / Prize Scam
+          * `romance_scam` - Romance Scam
+          * `tech_support` - Tech Support Scam
+          * `impersonation` - Government / Bank Impersonation
+          * `job_scam` - Fake Job Offer
+          * `upi_fraud` - UPI / Payment Fraud
+          * `malware` - Malware / Ransomware
+          * `social_engineering` - Social Engineering
+          * `fake_ecommerce` - Fake E-Commerce
+          * `cryptocurrency` - Cryptocurrency Fraud
+          * `other` - Other
+      - in: query
+        name: is_verified
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: severity
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+          - 4
+        description: |-
+          * `1` - Low
+          * `2` - Medium
+          * `3` - High
+          * `4` - Critical
+      - in: query
+        name: source
+        schema:
+          type: string
+          enum:
+          - ai_detected
+          - cert_in
+          - external_feed
+          - manual
+          - rbi
+          - user_reported
+        description: |-
+          * `manual` - Manually Added
+          * `ai_detected` - AI Detected
+          * `user_reported` - User Reported
+          * `external_feed` - External Threat Feed
+          * `cert_in` - CERT-In Advisory
+          * `rbi` - RBI Advisory
+      tags:
+      - Threats
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedThreatDatabaseListList'
+          description: ''
+  /api/v1/threats/{id}/:
+    get:
+      operationId: v1_threats_retrieve
+      description: GET /api/v1/threats/<id>/
+      summary: Get threat details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Threats
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatDatabaseDetail'
+          description: ''
+  /api/v1/threats/search/:
+    post:
+      operationId: v1_threats_search_create
+      description: |-
+        POST /api/v1/threats/search/
+        Search threats by text, URL, or phone number.
+        Used by clients for quick threat lookups before submitting a full scan.
+      summary: Search threat database
+      tags:
+      - Threats
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatSearch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ThreatSearch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ThreatSearch'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatSearchResponse'
+          description: ''
+  /api/v1/threats/stats/:
+    get:
+      operationId: v1_threats_stats_retrieve
+      description: GET /api/v1/threats/stats/ - Threat category statistics for dashboard.
+      summary: Threat statistics
+      tags:
+      - Threats
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatStatsResponse'
+          description: ''
+  /api/v1/users/auth/forgot-password/:
+    post:
+      operationId: v1_users_auth_forgot_password_create
+      description: |-
+        POST /api/v1/auth/forgot-password/
+        Request a password reset email.
+      summary: Request password reset email
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordReset'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordReset'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RequestPasswordReset'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+  /api/v1/users/auth/login/:
+    post:
+      operationId: v1_users_auth_login_create
+      description: |-
+        POST /api/v1/auth/login/
+        Authenticate user with email/password and return JWT tokens.
+      summary: Login with email & password
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CyberDaddyTokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CyberDaddyTokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CyberDaddyTokenObtainPair'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CyberDaddyTokenObtainPair'
+          description: ''
+  /api/v1/users/auth/logout/:
+    post:
+      operationId: v1_users_auth_logout_create
+      description: |-
+        POST /api/v1/auth/logout/
+        Blacklist the refresh token and deactivate the current device session.
+      summary: Logout current session
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Logout'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Logout'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Logout'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+  /api/v1/users/auth/logout-all/:
+    post:
+      operationId: v1_users_auth_logout_all_create
+      description: |-
+        POST /api/v1/auth/logout-all/
+        Log out from all devices except the current one.
+      summary: Logout all other devices
+      tags:
+      - Auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+  /api/v1/users/auth/phone-otp/request/:
+    post:
+      operationId: v1_users_auth_phone_otp_request_create
+      description: |-
+        POST /api/v1/auth/phone-otp/request/
+        Send a 6-digit OTP to the given phone number.
+      summary: Request phone OTP
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhoneOTPRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PhoneOTPRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PhoneOTPRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+  /api/v1/users/auth/phone-otp/verify/:
+    post:
+      operationId: v1_users_auth_phone_otp_verify_create
+      description: |-
+        POST /api/v1/auth/phone-otp/verify/
+        Verify the OTP and mark phone as verified.
+      summary: Verify phone OTP
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhoneOTPVerify'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PhoneOTPVerify'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PhoneOTPVerify'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/users/auth/register/:
+    post:
+      operationId: v1_users_auth_register_create
+      description: |-
+        POST /api/v1/auth/register/
+        Create a new user account. Sends verification email automatically.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRegistration'
+          description: ''
+  /api/v1/users/auth/resend-verification/:
+    post:
+      operationId: v1_users_auth_resend_verification_create
+      description: |-
+        POST /api/v1/auth/resend-verification/
+        Resend email verification link to the authenticated user.
+      summary: Resend email verification
+      tags:
+      - Auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/users/auth/reset-password/:
+    post:
+      operationId: v1_users_auth_reset_password_create
+      description: |-
+        POST /api/v1/auth/reset-password/
+        Set a new password using the reset token.
+      summary: Reset password with token
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPasswordReset'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConfirmPasswordReset'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConfirmPasswordReset'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/users/auth/token/refresh/:
+    post:
+      operationId: v1_users_auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/users/auth/token/verify/:
+    post:
+      operationId: v1_users_auth_token_verify_create
+      description: |-
+        Takes a token and indicates if it is valid.  This view provides no
+        information about a token's fitness for a particular use.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerify'
+          description: ''
+  /api/v1/users/auth/verify-email/:
+    post:
+      operationId: v1_users_auth_verify_email_create
+      description: |-
+        POST /api/v1/auth/verify-email/
+        Verify user email using the token from the verification link.
+      summary: Verify user email address
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmailVerification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmailVerification'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/users/change-password/:
+    post:
+      operationId: v1_users_change_password_create
+      description: |-
+        POST /api/v1/users/change-password/
+        Change password for authenticated user.
+      summary: Change user password
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePassword'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/users/me/:
+    get:
+      operationId: v1_users_me_retrieve
+      description: |-
+        GET  /api/v1/users/me/    → Get current user profile
+        PUT  /api/v1/users/me/    → Update current user profile
+        PATCH /api/v1/users/me/   → Partial update
+      summary: Get current user profile
+      tags:
+      - Users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    put:
+      operationId: v1_users_me_update
+      description: |-
+        GET  /api/v1/users/me/    → Get current user profile
+        PUT  /api/v1/users/me/    → Update current user profile
+        PATCH /api/v1/users/me/   → Partial update
+      summary: Update user profile
+      tags:
+      - Users
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileUpdate'
+          description: ''
+    patch:
+      operationId: v1_users_me_partial_update
+      description: |-
+        GET  /api/v1/users/me/    → Get current user profile
+        PUT  /api/v1/users/me/    → Update current user profile
+        PATCH /api/v1/users/me/   → Partial update
+      summary: Partial update user profile
+      tags:
+      - Users
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdate'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileUpdate'
+          description: ''
+  /api/v1/users/sessions/:
+    get:
+      operationId: v1_users_sessions_list
+      description: |-
+        GET /api/v1/users/sessions/
+        List all active device sessions for the current user.
+      summary: List active sessions
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserSessionList'
+          description: ''
+  /api/v1/users/sessions/{session_id}/:
+    delete:
+      operationId: v1_users_sessions_destroy
+      description: |-
+        DELETE /api/v1/users/sessions/<session_id>/
+        Revoke a specific device session.
+      summary: Revoke a device session
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+components:
+  schemas:
+    AIInsight:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        safety_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          description: Current AI-calculated safety score
+        safety_score_trend:
+          $ref: '#/components/schemas/SafetyScoreTrendEnum'
+        risk_profile:
+          $ref: '#/components/schemas/RiskProfileEnum'
+        total_scans:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        total_threats_detected:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        threats_blocked_this_month:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        threat_frequency_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          description: Average threats encountered per week
+        top_scam_categories:
+          description: Ranked list of scam categories this user encounters most
+        weekly_scan_trend:
+          description: '[{week: ''YYYY-WW'', scans: N, threats: N}, ...] for the past
+            12 weeks'
+        monthly_safety_trend:
+          description: '[{month: ''YYYY-MM'', safety_score: N}, ...] for the past
+            6 months'
+        recommendations:
+          description: Personalized safety recommendations from AI analysis
+        personalized_tips:
+          description: Behavioral safety tips tailored to this user's threat profile
+        scam_categories_breakdown:
+          description: Category → count breakdown of all detected scams
+        ai_narrative:
+          type: string
+          description: Full AI-written safety narrative for the user's weekly report
+        last_analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record last update timestamp
+      required:
+      - id
+      - updated_at
+    AccountStatusEnum:
+      enum:
+      - active
+      - inactive
+      - suspended
+      - pending_verification
+      type: string
+      description: |-
+        * `active` - Active
+        * `inactive` - Inactive
+        * `suspended` - Suspended
+        * `pending_verification` - Pending Email Verification
+    AccountTypeEnum:
+      enum:
+      - individual
+      - family_admin
+      - family_member
+      - enterprise
+      type: string
+      description: |-
+        * `individual` - Individual
+        * `family_admin` - Family Admin
+        * `family_member` - Family Member
+        * `enterprise` - Enterprise
+    BillingCycleEnum:
+      enum:
+      - monthly
+      - yearly
+      - lifetime
+      type: string
+      description: |-
+        * `monthly` - Monthly
+        * `yearly` - Yearly
+        * `lifetime` - Lifetime
+    CancelSubscriptionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        access_until:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - access_until
+      - message
+      - success
+    CategoryEnum:
+      enum:
+      - phishing
+      - financial_fraud
+      - lottery_scam
+      - romance_scam
+      - tech_support
+      - impersonation
+      - job_scam
+      - upi_fraud
+      - malware
+      - social_engineering
+      - fake_ecommerce
+      - cryptocurrency
+      - other
+      type: string
+      description: |-
+        * `phishing` - Phishing
+        * `financial_fraud` - Financial / Investment Fraud
+        * `lottery_scam` - Lottery / Prize Scam
+        * `romance_scam` - Romance Scam
+        * `tech_support` - Tech Support Scam
+        * `impersonation` - Government / Bank Impersonation
+        * `job_scam` - Fake Job Offer
+        * `upi_fraud` - UPI / Payment Fraud
+        * `malware` - Malware / Ransomware
+        * `social_engineering` - Social Engineering
+        * `fake_ecommerce` - Fake E-Commerce
+        * `cryptocurrency` - Cryptocurrency Fraud
+        * `other` - Other
+    ChangePassword:
+      type: object
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+        confirm_password:
+          type: string
+      required:
+      - confirm_password
+      - current_password
+      - new_password
+    ChannelEnum:
+      enum:
+      - push
+      - email
+      - sms
+      - in_app
+      type: string
+      description: |-
+        * `push` - Push Notification
+        * `email` - Email
+        * `sms` - SMS
+        * `in_app` - In-App
+    ConfirmPasswordReset:
+      type: object
+      properties:
+        token:
+          type: string
+        new_password:
+          type: string
+        confirm_password:
+          type: string
+      required:
+      - confirm_password
+      - new_password
+      - token
+    CyberDaddyTokenObtainPair:
+      type: object
+      description: |-
+        Customized JWT serializer that embeds user claims into the token payload.
+        This reduces DB lookups for basic user info in downstream services.
+      properties:
+        email:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - email
+      - password
+    DeviceTypeEnum:
+      enum:
+      - mobile
+      - tablet
+      - desktop
+      - other
+      type: string
+      description: |-
+        * `mobile` - Mobile
+        * `tablet` - Tablet
+        * `desktop` - Desktop
+        * `other` - Other
+    EmailVerification:
+      type: object
+      properties:
+        token:
+          type: string
+      required:
+      - token
+    ErrorDetail:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+      - message
+    ErrorResponse:
+      type: object
+      description: 'Standard error response: {"success": false, "error": {"message":
+        "..."}}'
+      properties:
+        success:
+          type: boolean
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      required:
+      - error
+      - success
+    FamilyDashboard:
+      type: object
+      description: Aggregated family safety dashboard — matches GET /api/v1/family/dashboard/
+        response.
+      properties:
+        group:
+          $ref: '#/components/schemas/FamilyGroup'
+        member_count:
+          type: integer
+        total_scans_this_month:
+          type: integer
+        threats_this_month:
+          type: integer
+        average_safety_score:
+          type: number
+          format: double
+        member_safety_scores:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberSafetyScore'
+      required:
+      - average_safety_score
+      - group
+      - member_count
+      - member_safety_scores
+      - threats_this_month
+      - total_scans_this_month
+    FamilyGroup:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        name:
+          type: string
+          description: Family group display name
+          maxLength: 100
+        description:
+          type: string
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        admin:
+          allOf:
+          - $ref: '#/components/schemas/UserProfile'
+          readOnly: true
+        invite_code:
+          type: string
+          readOnly: true
+          description: 6-12 character unique invite code (case-insensitive)
+        is_invite_active:
+          type: boolean
+        member_count:
+          type: integer
+          readOnly: true
+        max_members:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        status:
+          $ref: '#/components/schemas/FamilyGroupStatusEnum'
+        average_safety_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        total_scans:
+          type: integer
+          readOnly: true
+        threats_detected:
+          type: integer
+          readOnly: true
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/FamilyMember'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record creation timestamp
+      required:
+      - admin
+      - average_safety_score
+      - created_at
+      - id
+      - invite_code
+      - member_count
+      - members
+      - name
+      - threats_detected
+      - total_scans
+    FamilyGroupCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Family group display name
+          maxLength: 100
+        description:
+          type: string
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+      required:
+      - name
+    FamilyGroupStatusEnum:
+      enum:
+      - active
+      - suspended
+      type: string
+      description: |-
+        * `active` - Active
+        * `suspended` - Suspended
+    FamilyMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        user:
+          allOf:
+          - $ref: '#/components/schemas/UserProfile'
+          readOnly: true
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        role_display:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+        can_be_monitored:
+          type: boolean
+          description: If True, this member's activity appears on family dashboard
+        alert_parent_on_threat:
+          type: boolean
+          description: If True, parents/guardians are alerted when this member encounters
+            a threat
+        joined_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - joined_at
+      - role_display
+      - user
+    HealthCheck:
+      type: object
+      description: Response shape for GET /api/health/
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthCheckStatusEnum'
+        services:
+          $ref: '#/components/schemas/HealthCheckService'
+      required:
+      - services
+      - status
+    HealthCheckService:
+      type: object
+      properties:
+        database:
+          type: string
+        cache:
+          type: string
+      required:
+      - cache
+      - database
+    HealthCheckStatusEnum:
+      enum:
+      - healthy
+      - degraded
+      type: string
+      description: |-
+        * `healthy` - healthy
+        * `degraded` - degraded
+    JoinFamily:
+      type: object
+      properties:
+        invite_code:
+          type: string
+          maxLength: 12
+          minLength: 6
+      required:
+      - invite_code
+    JoinFamilyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        member:
+          $ref: '#/components/schemas/FamilyMember'
+      required:
+      - member
+      - message
+      - success
+    Logout:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: JWT refresh token to blacklist. Optional — session is logged
+            out regardless.
+    MarkAllReadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        marked_read:
+          type: integer
+      required:
+      - marked_read
+      - success
+    MatchMethodEnum:
+      enum:
+      - keyword
+      - url
+      - ai
+      - regex
+      type: string
+      description: |-
+        * `keyword` - Keyword Match
+        * `url` - URL Match
+        * `ai` - AI Pattern Match
+        * `regex` - Regex Match
+    MemberSafetyScore:
+      type: object
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+        safety_score:
+          type: number
+          format: double
+      required:
+      - member_id
+      - name
+      - role
+      - safety_score
+    Message:
+      type: object
+      description: 'Standard success response: {"success": true, "message": "..."}'
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+      - message
+      - success
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        notification_type:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTypeEnum'
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        body:
+          type: string
+          readOnly: true
+        channel:
+          allOf:
+          - $ref: '#/components/schemas/ChannelEnum'
+          readOnly: true
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/NotificationStatusEnum'
+          readOnly: true
+        data:
+          readOnly: true
+          description: Additional data payload (e.g., scan_id, threat_id for deep
+            links)
+        sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        read_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        related_scan_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record creation timestamp
+      required:
+      - body
+      - channel
+      - created_at
+      - data
+      - id
+      - notification_type
+      - priority
+      - read_at
+      - related_scan_id
+      - sent_at
+      - status
+      - title
+    NotificationStatusEnum:
+      enum:
+      - pending
+      - sent
+      - delivered
+      - failed
+      - read
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `sent` - Sent
+        * `delivered` - Delivered
+        * `failed` - Failed
+        * `read` - Read
+    NotificationTypeEnum:
+      enum:
+      - threat_alert
+      - scan_complete
+      - family_alert
+      - weekly_report
+      - subscription
+      - payment
+      - system
+      - welcome
+      type: string
+      description: |-
+        * `threat_alert` - Threat Alert
+        * `scan_complete` - Scan Complete
+        * `family_alert` - Family Alert
+        * `weekly_report` - Weekly Safety Report
+        * `subscription` - Subscription Update
+        * `payment` - Payment Notification
+        * `system` - System Notification
+        * `welcome` - Welcome Message
+    PaginatedFamilyMemberList:
+      type: object
+      properties:
+        count:
+          type: integer
+        total_pages:
+          type: integer
+        current_page:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FamilyMember'
+    PaginatedNotificationList:
+      type: object
+      properties:
+        count:
+          type: integer
+        total_pages:
+          type: integer
+        current_page:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    PaginatedScanHistoryListList:
+      type: object
+      properties:
+        count:
+          type: integer
+        total_pages:
+          type: integer
+        current_page:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScanHistoryList'
+    PaginatedThreatDatabaseListList:
+      type: object
+      properties:
+        count:
+          type: integer
+        total_pages:
+          type: integer
+        current_page:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThreatDatabaseList'
+    PaginatedUserSessionList:
+      type: object
+      properties:
+        count:
+          type: integer
+        total_pages:
+          type: integer
+        current_page:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSession'
+    PatchedFamilyGroup:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        name:
+          type: string
+          description: Family group display name
+          maxLength: 100
+        description:
+          type: string
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        admin:
+          allOf:
+          - $ref: '#/components/schemas/UserProfile'
+          readOnly: true
+        invite_code:
+          type: string
+          readOnly: true
+          description: 6-12 character unique invite code (case-insensitive)
+        is_invite_active:
+          type: boolean
+        member_count:
+          type: integer
+          readOnly: true
+        max_members:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        status:
+          $ref: '#/components/schemas/FamilyGroupStatusEnum'
+        average_safety_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        total_scans:
+          type: integer
+          readOnly: true
+        threats_detected:
+          type: integer
+          readOnly: true
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/FamilyMember'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record creation timestamp
+    PatchedUpdateMemberRole:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        can_be_monitored:
+          type: boolean
+          description: If True, this member's activity appears on family dashboard
+        alert_parent_on_threat:
+          type: boolean
+          description: If True, parents/guardians are alerted when this member encounters
+            a threat
+        permissions:
+          description: Fine-grained permission overrides for this member
+    PatchedUserProfileUpdate:
+      type: object
+      description: Partial update for user profile (name, timezone, preferences).
+      properties:
+        full_name:
+          type: string
+          maxLength: 255
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        timezone:
+          type: string
+          maxLength: 50
+        language:
+          type: string
+          maxLength: 10
+        notification_preferences:
+          description: User notification channel preferences
+    PaymentMethodEnum:
+      enum:
+      - stripe
+      - razorpay
+      - none
+      type: string
+      description: |-
+        * `stripe` - Stripe
+        * `razorpay` - Razorpay
+        * `none` - None
+    PhoneOTPRequest:
+      type: object
+      properties:
+        phone_number:
+          type: string
+      required:
+      - phone_number
+    PhoneOTPVerify:
+      type: object
+      properties:
+        phone_number:
+          type: string
+        otp:
+          type: string
+          maxLength: 6
+          minLength: 6
+      required:
+      - otp
+      - phone_number
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price_monthly_inr:
+          type: integer
+          nullable: true
+        price_yearly_inr:
+          type: integer
+          nullable: true
+        features:
+          type: object
+          additionalProperties: {}
+          description: Plan feature flags and limits
+      required:
+      - features
+      - id
+      - name
+      - price_monthly_inr
+      - price_yearly_inr
+    PlanEnum:
+      enum:
+      - free
+      - premium
+      - family
+      - enterprise
+      type: string
+      description: |-
+        * `free` - Free
+        * `premium` - Premium
+        * `family` - Family
+        * `enterprise` - Enterprise
+    PlansListResponse:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/Plan'
+      required:
+      - plans
+    PriorityEnum:
+      enum:
+      - low
+      - normal
+      - high
+      - critical
+      type: string
+      description: |-
+        * `low` - Low
+        * `normal` - Normal
+        * `high` - High
+        * `critical` - Critical
+    RecommendationsResponse:
+      type: object
+      properties:
+        recommendations:
+          type: array
+          items:
+            type: string
+        personalized_tips:
+          type: array
+          items:
+            type: string
+        ai_narrative:
+          type: string
+        last_analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - ai_narrative
+      - last_analyzed_at
+      - personalized_tips
+      - recommendations
+    RegenerateInviteCodeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        invite_code:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - expires_at
+      - invite_code
+      - success
+    RequestPasswordReset:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+      - email
+    RiskLevelEnum:
+      enum:
+      - safe
+      - low
+      - medium
+      - high
+      - critical
+      type: string
+      description: |-
+        * `safe` - Safe
+        * `low` - Low Risk
+        * `medium` - Medium Risk
+        * `high` - High Risk
+        * `critical` - Critical Threat
+    RiskProfileEnum:
+      enum:
+      - very_safe
+      - safe
+      - moderate
+      - high_risk
+      - critical
+      type: string
+      description: |-
+        * `very_safe` - Very Safe
+        * `safe` - Safe
+        * `moderate` - Moderate Risk
+        * `high_risk` - High Risk
+        * `critical` - Critical
+    RoleEnum:
+      enum:
+      - parent
+      - guardian
+      - child
+      - elderly
+      - member
+      type: string
+      description: |-
+        * `parent` - Parent
+        * `guardian` - Guardian
+        * `child` - Child
+        * `elderly` - Elderly
+        * `member` - Member
+    SafetyScoreResponse:
+      type: object
+      properties:
+        safety_score:
+          type: number
+          format: double
+        risk_profile:
+          type: string
+        safety_score_trend:
+          type: string
+      required:
+      - risk_profile
+      - safety_score
+    SafetyScoreTrendEnum:
+      enum:
+      - up
+      - down
+      - stable
+      type: string
+      description: |-
+        * `up` - Improving
+        * `down` - Declining
+        * `stable` - Stable
+    ScanHistory:
+      type: object
+      description: Full scan result with AI response and threat matches.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        scan_type:
+          allOf:
+          - $ref: '#/components/schemas/ScanHistoryScanTypeEnum'
+          readOnly: true
+        scan_type_display:
+          type: string
+          readOnly: true
+        scan_input_text:
+          type: string
+          description: Raw text input (for SMS, URL, email scans)
+        scan_input_url:
+          type: string
+          format: uri
+          description: URL being scanned
+          maxLength: 2048
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ScanHistoryStatusEnum'
+          readOnly: true
+        risk_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI-calculated risk score 0-100
+        risk_level:
+          allOf:
+          - $ref: '#/components/schemas/RiskLevelEnum'
+          readOnly: true
+        risk_level_display:
+          type: string
+          readOnly: true
+        is_threat:
+          type: boolean
+          readOnly: true
+        scam_category:
+          type: string
+          readOnly: true
+          description: Detected scam category (e.g., phishing, investment fraud)
+        ai_summary:
+          type: string
+          readOnly: true
+          description: Human-readable AI summary for display in app
+        ai_response:
+          readOnly: true
+          nullable: true
+          description: Full AI analysis result including reasoning, categories, recommendations
+        processing_time_ms:
+          type: integer
+          readOnly: true
+          nullable: true
+        threat_matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThreatScanMatch'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record creation timestamp
+      required:
+      - ai_response
+      - ai_summary
+      - created_at
+      - id
+      - is_threat
+      - processing_time_ms
+      - risk_level
+      - risk_level_display
+      - risk_score
+      - scam_category
+      - scan_type
+      - scan_type_display
+      - status
+      - threat_matches
+    ScanHistoryList:
+      type: object
+      description: |-
+        Lightweight scan list (no full AI response for performance).
+
+        scan_type and status are declared as CharField here to prevent drf-spectacular
+        from generating duplicate enum components (ScanHistorySerializer already owns
+        the ScanStatusEnum / ScanHistoryTypeEnum components).  Runtime behavior is
+        identical — the model values are serialized as strings regardless.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        scan_type:
+          type: string
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+        risk_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: AI-calculated risk score 0-100
+        risk_level:
+          allOf:
+          - $ref: '#/components/schemas/RiskLevelEnum'
+          readOnly: true
+        is_threat:
+          type: boolean
+          readOnly: true
+        scam_category:
+          type: string
+          readOnly: true
+          description: Detected scam category (e.g., phishing, investment fraud)
+        ai_summary:
+          type: string
+          readOnly: true
+          description: Human-readable AI summary for display in app
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record creation timestamp
+      required:
+      - ai_summary
+      - created_at
+      - id
+      - is_threat
+      - risk_level
+      - risk_score
+      - scam_category
+      - scan_type
+      - status
+    ScanHistoryScanTypeEnum:
+      enum:
+      - screenshot
+      - sms
+      - url
+      - email
+      - phone_number
+      type: string
+      description: |-
+        * `screenshot` - Screenshot / Image
+        * `sms` - SMS Text
+        * `url` - URL / Link
+        * `email` - Email Content
+        * `phone_number` - Phone Number
+    ScanHistoryStatusEnum:
+      enum:
+      - pending
+      - processing
+      - completed
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `processing` - Processing
+        * `completed` - Completed
+        * `failed` - Failed
+    ScanStatsResponse:
+      type: object
+      properties:
+        total_scans:
+          type: integer
+        threats_detected:
+          type: integer
+        average_risk_score:
+          type: number
+          format: double
+        scans_by_type:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        scans_by_risk_level:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        remaining_scans:
+          type: integer
+        current_plan:
+          type: string
+      required:
+      - average_risk_score
+      - current_plan
+      - remaining_scans
+      - scans_by_risk_level
+      - scans_by_type
+      - threats_detected
+      - total_scans
+    ScanSubmitResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        scan_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        message:
+          type: string
+        result_url:
+          type: string
+      required:
+      - message
+      - scan_id
+      - status
+      - success
+    ScanTypeInputEnum:
+      enum:
+      - sms
+      - url
+      - email
+      - phone_number
+      type: string
+      description: |-
+        * `sms` - sms
+        * `url` - url
+        * `email` - email
+        * `phone_number` - phone_number
+    SeverityEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      type: integer
+      description: |-
+        * `1` - Low
+        * `2` - Medium
+        * `3` - High
+        * `4` - Critical
+    SourceEnum:
+      enum:
+      - manual
+      - ai_detected
+      - user_reported
+      - external_feed
+      - cert_in
+      - rbi
+      type: string
+      description: |-
+        * `manual` - Manually Added
+        * `ai_detected` - AI Detected
+        * `user_reported` - User Reported
+        * `external_feed` - External Threat Feed
+        * `cert_in` - CERT-In Advisory
+        * `rbi` - RBI Advisory
+    SubmitScreenshotScan:
+      type: object
+      description: Serializer for screenshot scan with file upload.
+      properties:
+        image:
+          type: string
+          format: uri
+      required:
+      - image
+    SubmitTextScan:
+      type: object
+      description: Serializer for SMS, URL, Email, Phone scan requests.
+      properties:
+        scan_type:
+          $ref: '#/components/schemas/ScanTypeInputEnum'
+        content:
+          type: string
+          maxLength: 10000
+      required:
+      - content
+      - scan_type
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        plan:
+          allOf:
+          - $ref: '#/components/schemas/PlanEnum'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SubscriptionStatusEnum'
+          readOnly: true
+        billing_cycle:
+          $ref: '#/components/schemas/BillingCycleEnum'
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+        trial_ends_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        current_period_start:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        current_period_end:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        scans_used_this_period:
+          type: integer
+          readOnly: true
+        scans_limit:
+          type: integer
+          readOnly: true
+          description: Scans allowed per billing period (0 = unlimited)
+        remaining_scans:
+          type: integer
+          readOnly: true
+        plan_limits:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        payment_method:
+          allOf:
+          - $ref: '#/components/schemas/PaymentMethodEnum'
+          readOnly: true
+        last_payment_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        next_payment_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - current_period_end
+      - current_period_start
+      - id
+      - last_payment_at
+      - next_payment_at
+      - payment_method
+      - plan
+      - plan_limits
+      - remaining_scans
+      - scans_limit
+      - scans_used_this_period
+      - started_at
+      - status
+      - trial_ends_at
+    SubscriptionStatusEnum:
+      enum:
+      - active
+      - trial
+      - past_due
+      - cancelled
+      - expired
+      - paused
+      type: string
+      description: |-
+        * `active` - Active
+        * `trial` - Trial
+        * `past_due` - Past Due
+        * `cancelled` - Cancelled
+        * `expired` - Expired
+        * `paused` - Paused
+    ThreatDatabaseDetail:
+      type: object
+      description: Full threat detail for admin or detailed lookups.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        category_display:
+          type: string
+          readOnly: true
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/SeverityEnum'
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        severity_display:
+          type: string
+          readOnly: true
+        keywords:
+          description: List of keywords/phrases used for matching (e.g., ['free prize',
+            'click now'])
+        malicious_urls:
+          description: List of known malicious URLs or domain patterns
+        malicious_phone_numbers:
+          description: Reported phone numbers associated with this scam
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        credibility_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,3})?$
+          description: Confidence in this threat record (0-1)
+        is_verified:
+          type: boolean
+          description: Manually verified by security analyst
+        reported_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Number of times users have encountered this threat
+        first_seen:
+          type: string
+          format: date-time
+          nullable: true
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+        ai_metadata:
+          description: Additional AI-generated context for this threat
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record creation timestamp
+      required:
+      - category
+      - category_display
+      - created_at
+      - description
+      - id
+      - severity_display
+      - title
+    ThreatDatabaseList:
+      type: object
+      description: Lightweight threat listing for public API.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        title:
+          type: string
+          maxLength: 255
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/SeverityEnum'
+          minimum: -9223372036854775808
+          maximum: 9223372036854775807
+        is_verified:
+          type: boolean
+          description: Manually verified by security analyst
+        reported_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          description: Number of times users have encountered this threat
+        first_seen:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - category
+      - id
+      - title
+    ThreatScanMatch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        threat:
+          allOf:
+          - $ref: '#/components/schemas/ThreatDatabaseList'
+          readOnly: true
+        confidence_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,3})?$
+        match_method:
+          $ref: '#/components/schemas/MatchMethodEnum'
+        matched_text:
+          type: string
+          description: The specific text/URL that triggered this match
+      required:
+      - confidence_score
+      - id
+      - match_method
+      - threat
+    ThreatSearch:
+      type: object
+      description: Input for threat search API.
+      properties:
+        query:
+          type: string
+          maxLength: 500
+          minLength: 2
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        severity:
+          type: integer
+          maximum: 4
+          minimum: 1
+      required:
+      - query
+    ThreatSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThreatDatabaseList'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    ThreatStatsResponse:
+      type: object
+      properties:
+        total_active_threats:
+          type: integer
+        by_category:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        by_severity:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        most_reported:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - by_category
+      - by_severity
+      - most_reported
+      - total_active_threats
+    ThreatTrendsResponse:
+      type: object
+      properties:
+        weekly_scan_trend:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        monthly_safety_trend:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        scam_categories_breakdown:
+          type: object
+          additionalProperties: {}
+        top_scam_categories:
+          type: array
+          items:
+            type: string
+      required:
+      - monthly_safety_trend
+      - scam_categories_breakdown
+      - top_scam_categories
+      - weekly_scan_trend
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenVerify:
+      type: object
+      properties:
+        token:
+          type: string
+          writeOnly: true
+      required:
+      - token
+    UnreadCountResponse:
+      type: object
+      properties:
+        unread_count:
+          type: integer
+      required:
+      - unread_count
+    UpdateMemberRole:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        can_be_monitored:
+          type: boolean
+          description: If True, this member's activity appears on family dashboard
+        alert_parent_on_threat:
+          type: boolean
+          description: If True, parents/guardians are alerted when this member encounters
+            a threat
+        permissions:
+          description: Fine-grained permission overrides for this member
+    UserProfile:
+      type: object
+      description: Full user profile — used in auth responses and profile endpoints.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          maxLength: 255
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        account_type:
+          $ref: '#/components/schemas/AccountTypeEnum'
+        account_status:
+          allOf:
+          - $ref: '#/components/schemas/AccountStatusEnum'
+          readOnly: true
+        is_email_verified:
+          type: boolean
+        is_phone_verified:
+          type: boolean
+        safety_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+          description: AI-calculated safety score (0-100)
+        timezone:
+          type: string
+          maxLength: 50
+        language:
+          type: string
+          maxLength: 10
+        notification_preferences:
+          description: User notification channel preferences
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+        last_login:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - account_status
+      - date_joined
+      - email
+      - full_name
+      - id
+      - last_login
+      - safety_score
+    UserProfileUpdate:
+      type: object
+      description: Partial update for user profile (name, timezone, preferences).
+      properties:
+        full_name:
+          type: string
+          maxLength: 255
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        timezone:
+          type: string
+          maxLength: 50
+        language:
+          type: string
+          maxLength: 10
+        notification_preferences:
+          description: User notification channel preferences
+      required:
+      - full_name
+    UserRegistration:
+      type: object
+      description: Handles new user registration with password confirmation.
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        full_name:
+          type: string
+          maxLength: 255
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        password:
+          type: string
+          writeOnly: true
+        confirm_password:
+          type: string
+          writeOnly: true
+      required:
+      - confirm_password
+      - email
+      - full_name
+      - password
+    UserSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier (UUID v4)
+        device_name:
+          type: string
+          readOnly: true
+          description: Human-readable device name (e.g., 'iPhone 15 Pro')
+        device_type:
+          allOf:
+          - $ref: '#/components/schemas/DeviceTypeEnum'
+          readOnly: true
+        os_info:
+          type: string
+          readOnly: true
+        browser_info:
+          type: string
+          readOnly: true
+        ip_address:
+          type: string
+          readOnly: true
+          nullable: true
+        location_city:
+          type: string
+          readOnly: true
+        location_country:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        last_active_at:
+          type: string
+          format: date-time
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Record creation timestamp
+      required:
+      - browser_info
+      - created_at
+      - device_name
+      - device_type
+      - id
+      - ip_address
+      - is_active
+      - last_active_at
+      - location_city
+      - location_country
+      - os_info
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+- name: Auth
+  description: Authentication & Registration
+- name: Users
+  description: User Profile Management
+- name: Family
+  description: Family Circle Management
+- name: Scans
+  description: AI Scam Detection Scans
+- name: Threats
+  description: Threat Intelligence Database
+- name: Subscriptions
+  description: Plan & Subscription Management
+- name: Payments
+  description: Payment Processing
+- name: Notifications
+  description: Notification Management
+- name: Insights
+  description: AI Insights & Analytics
+- name: Health
+  description: Service Health Checks

@@ -8,9 +8,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, JSONParser
+from rest_framework import serializers
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiParameter
+from drf_spectacular.openapi import OpenApiTypes
 
 from .models import ScanHistory
 from .serializers import (
@@ -23,6 +25,18 @@ from apps.core.pagination import StandardResultsSetPagination
 
 logger = logging.getLogger(__name__)
 
+# Shared response shape for scan submission (202 Accepted)
+_ScanSubmitResponseSerializer = inline_serializer(
+    name="ScanSubmitResponse",
+    fields={
+        "success": serializers.BooleanField(),
+        "scan_id": serializers.UUIDField(),
+        "status": serializers.CharField(),
+        "message": serializers.CharField(),
+        "result_url": serializers.CharField(required=False),
+    },
+)
+
 
 class SubmitTextScanView(APIView):
     """
@@ -32,7 +46,12 @@ class SubmitTextScanView(APIView):
     """
     permission_classes = [IsAuthenticated, IsEmailVerified, HasScanQuota]
 
-    @extend_schema(tags=["Scans"], summary="Submit text scan (SMS/URL/Email)")
+    @extend_schema(
+        tags=["Scans"],
+        summary="Submit text scan (SMS/URL/Email)",
+        request=SubmitTextScanSerializer,
+        responses={202: _ScanSubmitResponseSerializer},
+    )
     def post(self, request):
         serializer = SubmitTextScanSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -68,7 +87,12 @@ class SubmitScreenshotScanView(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasScanQuota]
     parser_classes = [MultiPartParser]
 
-    @extend_schema(tags=["Scans"], summary="Submit screenshot scan")
+    @extend_schema(
+        tags=["Scans"],
+        summary="Submit screenshot scan",
+        request=SubmitScreenshotScanSerializer,
+        responses={202: _ScanSubmitResponseSerializer},
+    )
     def post(self, request):
         serializer = SubmitScreenshotScanSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -99,6 +123,9 @@ class ScanDetailView(generics.RetrieveAPIView):
     serializer_class = ScanHistorySerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return ScanHistory.objects.none()
+
         return ScanHistory.objects.filter(user=self.request.user).prefetch_related(
             "threat_matches__threat"
         )
@@ -122,9 +149,44 @@ class ScanHistoryListView(generics.ListAPIView):
     ordering = ["-created_at"]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return ScanHistory.objects.none()
+
         return ScanHistory.objects.filter(user=self.request.user)
 
-    @extend_schema(tags=["Scans"], summary="List scan history")
+    @extend_schema(
+        tags=["Scans"],
+        summary="List scan history",
+        parameters=[
+            OpenApiParameter(
+                name="scan_type",
+                type=OpenApiTypes.STR,
+                enum=["screenshot", "sms", "url", "email", "phone_number"],
+                required=False,
+                description="Filter by scan type",
+            ),
+            OpenApiParameter(
+                name="status",
+                type=OpenApiTypes.STR,
+                enum=["pending", "processing", "completed", "failed"],
+                required=False,
+                description="Filter by scan status",
+            ),
+            OpenApiParameter(
+                name="risk_level",
+                type=OpenApiTypes.STR,
+                enum=["safe", "low", "medium", "high", "critical"],
+                required=False,
+                description="Filter by risk level",
+            ),
+            OpenApiParameter(
+                name="is_threat",
+                type=OpenApiTypes.BOOL,
+                required=False,
+                description="Filter by threat flag",
+            ),
+        ],
+    )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -136,7 +198,24 @@ class ScanStatsView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Scans"], summary="Get scan statistics")
+    @extend_schema(
+        tags=["Scans"],
+        summary="Get scan statistics",
+        responses={
+            200: inline_serializer(
+                name="ScanStatsResponse",
+                fields={
+                    "total_scans": serializers.IntegerField(),
+                    "threats_detected": serializers.IntegerField(),
+                    "average_risk_score": serializers.FloatField(),
+                    "scans_by_type": serializers.ListField(child=serializers.DictField()),
+                    "scans_by_risk_level": serializers.ListField(child=serializers.DictField()),
+                    "remaining_scans": serializers.IntegerField(),
+                    "current_plan": serializers.CharField(),
+                },
+            )
+        },
+    )
     def get(self, request):
         from django.db.models import Count, Avg, Q
         from django.core.cache import cache

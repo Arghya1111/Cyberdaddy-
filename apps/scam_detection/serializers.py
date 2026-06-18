@@ -3,6 +3,8 @@ CyberDaddy - Scam Detection Serializers
 """
 
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.openapi import OpenApiTypes
 from .models import ScanHistory, ThreatScanMatch
 from apps.threat_intelligence.serializers import ThreatDatabaseListSerializer
 
@@ -33,19 +35,34 @@ class ScanHistorySerializer(serializers.ModelSerializer):
             "threat_matches",
             "created_at",
         ]
+        # All fields are read-only — scans are created via SubmitTextScanSerializer,
+        # not updated through this endpoint.
         read_only_fields = [
-            "id", "status", "risk_score", "risk_level", "is_threat",
+            "id", "scan_type", "status", "risk_score", "risk_level", "is_threat",
             "scam_category", "ai_summary", "ai_response", "processing_time_ms",
             "threat_matches", "created_at",
         ]
 
 
 class ScanHistoryListSerializer(serializers.ModelSerializer):
-    """Lightweight scan list (no full AI response for performance)."""
+    """Lightweight scan list (no full AI response for performance).
+
+    scan_type and status are declared as CharField here to prevent drf-spectacular
+    from generating duplicate enum components (ScanHistorySerializer already owns
+    the ScanStatusEnum / ScanHistoryTypeEnum components).  Runtime behavior is
+    identical — the model values are serialized as strings regardless.
+    """
+    scan_type = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
 
     class Meta:
         model = ScanHistory
         fields = [
+            "id", "scan_type", "status", "risk_score",
+            "risk_level", "is_threat", "scam_category",
+            "ai_summary", "created_at",
+        ]
+        read_only_fields = [
             "id", "scan_type", "status", "risk_score",
             "risk_level", "is_threat", "scam_category",
             "ai_summary", "created_at",

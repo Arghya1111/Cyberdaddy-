@@ -253,6 +253,47 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "CONTACT": {"email": "dev@cyberdaddy.in"},
     "LICENSE": {"name": "Proprietary"},
+    "ENUM_NAME_OVERRIDES": {
+        "ScanStatusEnum": [
+            "pending", "processing", "completed", "failed",
+        ],
+        "RiskLevelEnum": [
+            "safe", "low", "medium", "high", "critical",
+        ],
+        "ScanTypeEnum": [
+            "screenshot", "sms", "url", "email", "phone_number",
+        ],
+        "SubscriptionStatusEnum": [
+            "active", "trial", "past_due", "cancelled", "expired", "paused",
+        ],
+        "NotificationStatusEnum": [
+            "pending", "sent", "delivered", "failed", "read",
+        ],
+        "NotificationPriorityEnum": [
+            "low", "normal", "high", "critical",
+        ],
+        "NotificationTypeEnum": [
+            "threat_alert", "scan_complete", "family_alert", "weekly_report",
+            "subscription", "payment", "system", "welcome",
+        ],
+        "FamilyGroupStatusEnum": ["active", "suspended"],
+        "MemberRoleEnum": [
+            "parent", "guardian", "child", "elderly", "member",
+        ],
+        "UserAccountStatusEnum": [
+            "active", "inactive", "suspended", "pending_verification",
+        ],
+        "UserAccountTypeEnum": [
+            "individual", "family_admin", "family_member", "enterprise",
+        ],
+        "ScanTypeInputEnum": [
+            "sms", "url", "email", "phone_number",
+        ],
+        "ScanHistoryTypeEnum": [
+            "screenshot", "sms", "url", "email", "phone_number",
+        ],
+    },
+    "COMPONENT_SPLIT_REQUEST": False,
 }
 
 # ============================================================

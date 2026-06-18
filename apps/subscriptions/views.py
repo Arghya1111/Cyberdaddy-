@@ -7,9 +7,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_field, inline_serializer
+from drf_spectacular.openapi import OpenApiTypes
 
 from .models import Subscription
+from apps.core.serializers import MessageSerializer, ErrorResponseSerializer
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
@@ -28,7 +30,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [f for f in fields if f != "billing_cycle"]
 
-    def get_plan_limits(self, obj):
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_plan_limits(self, obj) -> dict:
         return obj.PLAN_LIMITS.get(obj.plan, {})
 
 
@@ -61,7 +64,31 @@ class PlansListView(APIView):
     permission_classes = []
     authentication_classes = []
 
-    @extend_schema(tags=["Subscriptions"], summary="List available plans")
+    @extend_schema(
+        tags=["Subscriptions"],
+        summary="List available plans",
+        responses={
+            200: inline_serializer(
+                name="PlansListResponse",
+                fields={
+                    "plans": serializers.ListField(
+                        child=inline_serializer(
+                            name="Plan",
+                            fields={
+                                "id": serializers.CharField(),
+                                "name": serializers.CharField(),
+                                "price_monthly_inr": serializers.IntegerField(allow_null=True),
+                                "price_yearly_inr": serializers.IntegerField(allow_null=True),
+                                "features": serializers.DictField(
+                                    help_text="Plan feature flags and limits"
+                                ),
+                            },
+                        )
+                    )
+                },
+            )
+        },
+    )
     def get(self, request):
         plans = [
             {
@@ -136,7 +163,22 @@ class CancelSubscriptionView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Subscriptions"], summary="Cancel subscription")
+    @extend_schema(
+        tags=["Subscriptions"],
+        summary="Cancel subscription",
+        request=None,
+        responses={
+            200: inline_serializer(
+                name="CancelSubscriptionResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                    "access_until": serializers.DateTimeField(allow_null=True),
+                },
+            ),
+            400: ErrorResponseSerializer,
+        },
+    )
     def post(self, request):
         try:
             subscription = request.user.subscription
