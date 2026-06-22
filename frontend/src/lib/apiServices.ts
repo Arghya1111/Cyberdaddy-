@@ -85,7 +85,8 @@ export const authService = {
   },
 
   async logout(refresh: string): Promise<void> {
-    await apiClient.post('/users/auth/logout/', { refresh });
+    // Backend LogoutSerializer expects { refresh_token }, not { refresh }
+    await apiClient.post('/users/auth/logout/', { refresh_token: refresh });
   },
 
   /** Verify email using the token from the verification link URL. */
@@ -99,6 +100,41 @@ export const authService = {
     const { data } = await apiClient.post<APIResendVerificationResponse>(
       '/users/auth/resend-verification/',
       { email },
+    );
+    return data;
+  },
+
+  /** Request a password-reset email (no auth required).
+   *  Backend: POST /users/auth/forgot-password/ */
+  async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>(
+      '/users/auth/forgot-password/',
+      { email },
+    );
+    return data;
+  },
+
+  /** Confirm password reset with the token from the email link.
+   *  Backend: POST /users/auth/reset-password/
+   *  Payload: { token, new_password, confirm_password } */
+  async confirmPasswordReset(payload: {
+    token: string;
+    new_password: string;
+    confirm_password: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>(
+      '/users/auth/reset-password/',
+      payload,
+    );
+    return data;
+  },
+
+  /** Refresh an access token using a refresh token (no auth header needed).
+   *  Backend: POST /users/auth/token/refresh/ */
+  async refreshAccessToken(refresh: string): Promise<{ access: string }> {
+    const { data } = await apiClient.post<{ access: string }>(
+      '/users/auth/token/refresh/',
+      { refresh },
     );
     return data;
   },
@@ -128,7 +164,12 @@ export const userService = {
     new_password: string;
     confirm_password: string;
   }): Promise<void> {
-    await apiClient.post('/users/me/change-password/', payload);
+    // Backend path: /users/change-password/ (NOT /users/me/change-password/)
+    await apiClient.post('/users/change-password/', payload);
+  },
+
+  async deleteAccount(): Promise<void> {
+    await apiClient.delete('/users/me/');
   },
 };
 
@@ -189,6 +230,7 @@ export const scanService = {
     page_size?: number;
     scan_type?: string;
     risk_level?: string;
+    search?: string;
     ordering?: string;
   }): Promise<PaginatedResponse<APIScanListItem>> {
     const { data } = await apiClient.get<PaginatedResponse<APIScanListItem>>('/scans/history/', { params });
@@ -279,6 +321,19 @@ export const familyService = {
   async createFamily(name: string): Promise<APIFamilyGroup> {
     const { data } = await apiClient.post<APIFamilyGroup>('/family/create/', { name });
     return data;
+  },
+
+  async removeMember(memberId: string): Promise<void> {
+    // Backend path: /family/members/<uuid>/remove/ (NOT /family/members/<uuid>/)
+    await apiClient.delete(`/family/members/${memberId}/remove/`);
+  },
+
+  async regenerateInviteCode(): Promise<{ invite_code: string }> {
+    // Backend path: /family/invite/regenerate/ (NOT /family/regenerate-invite/)
+    const { data } = await apiClient.post<{ invite_code: string; expires_at: string; success: boolean }>(
+      '/family/invite/regenerate/',
+    );
+    return { invite_code: data.invite_code };
   },
 };
 

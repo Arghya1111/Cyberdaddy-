@@ -356,9 +356,10 @@ class PhoneOTPVerifyView(APIView):
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """
-    GET  /api/v1/users/me/    → Get current user profile
-    PUT  /api/v1/users/me/    → Update current user profile
-    PATCH /api/v1/users/me/   → Partial update
+    GET    /api/v1/users/me/  → Get current user profile
+    PUT    /api/v1/users/me/  → Update current user profile
+    PATCH  /api/v1/users/me/  → Partial update
+    DELETE /api/v1/users/me/  → Permanently delete account (soft-delete)
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, JSONParser]
@@ -382,6 +383,59 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     @extend_schema(tags=["Users"], summary="Partial update user profile")
     def patch(self, request, *args, **kwargs):
         return super().patch(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=["Users"],
+        summary="Delete user account",
+        description=(
+            "Permanently (soft) deletes the authenticated user's account. "
+            "All active sessions are invalidated. If the user is a family group admin, "
+            "the group is suspended so members cannot be left in a broken state. "
+            "The operation is irreversible from the frontend — accounts remain in the DB "
+            "for 30 days for compliance before hard deletion."
+        ),
+        responses={
+            200: inline_serializer(
+                name="DeleteAccountResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                },
+            ),
+        },
+    )
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+
+        # 1. Suspend any family group the user administers so members
+        #    are not left in a permanently broken state.
+        try:
+            from apps.family.models import FamilyGroup
+            if hasattr(user, "managed_family_group"):
+                group = user.managed_family_group
+                group.status = FamilyGroup.GroupStatus.SUSPENDED
+                group.save(update_fields=["status"])
+                logger.info(
+                    f"Family group {group.id} suspended — admin account deleted: {user.email}"
+                )
+        except Exception as exc:  # pragma: no cover
+            logger.warning(f"Family group deactivation skipped during account deletion: {exc}")
+
+        # 2. Invalidate all active device sessions.
+        try:
+            SessionService.logout_all_sessions(user)
+        except Exception as exc:  # pragma: no cover
+            logger.warning(f"Session cleanup failed during account deletion: {exc}")
+
+        # 3. Soft-delete (sets deleted_at via SoftDeleteModel.delete()).
+        #    The user object is no longer returned by the default manager.
+        logger.info(f"User account soft-deleted: {user.email} ({user.id})")
+        user.delete()
+
+        return Response(
+            {"success": True, "message": "Account deleted successfully."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class ChangePasswordView(APIView):

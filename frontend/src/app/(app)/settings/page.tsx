@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, Shield, Eye, Save, CheckCircle2, Loader2 } from 'lucide-react';
+import { Bell, Shield, Eye, Save, CheckCircle2, Loader2, AlertTriangle, X, AlertCircle } from 'lucide-react';
 import { userService } from '@/lib/apiServices';
+import { normalizeError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -49,8 +50,91 @@ const DEFAULT_PREFS: Record<string, boolean> = {
 
 
 
+// ─── Delete Account Confirmation Modal ───────────────────
+
+function DeleteAccountModal({ onClose, onDeleted }: { onClose: () => void; onDeleted: () => void }) {
+  const [confirm, setConfirm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await userService.deleteAccount();
+      onDeleted();
+    } catch (err) {
+      setError(normalizeError(err).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md p-6 rounded-2xl bg-[#0e1628] border border-red-500/20 shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4 text-red-400" />
+            </div>
+            <h2 className="text-base font-bold text-white">Delete Account</h2>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="mb-5 p-3 rounded-xl bg-red-500/5 border border-red-500/15">
+          <p className="text-sm text-red-400/80 leading-relaxed">
+            This action is <strong className="text-red-400">permanent</strong> and cannot be undone.
+            All your scans, settings, and family data will be erased.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-white/50 mb-2 uppercase tracking-wider">
+            Type <span className="text-red-400">DELETE</span> to confirm
+          </label>
+          <input
+            type="text"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="DELETE"
+            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-red-500/50 transition-all placeholder:text-white/20 font-mono"
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm hover:bg-white/5 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isLoading || confirm !== 'DELETE'}
+            className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-500 disabled:opacity-40 flex items-center justify-center gap-2 transition-all"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+            Delete Forever
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Settings Page ────────────────────────────────────────
+
 export default function SettingsPage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
 
   const [prefs, setPrefs] = useState<Record<string, boolean>>(() => ({
     ...DEFAULT_PREFS,
@@ -60,6 +144,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const toggle = (key: string) => {
     setPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -161,14 +246,28 @@ export default function SettingsPage() {
         {/* Danger Zone */}
         <div className="p-5 rounded-2xl bg-red-500/5 border border-red-500/20 backdrop-blur-sm">
           <h2 className="text-sm font-semibold text-red-400 mb-4">Danger Zone</h2>
-          <button className="w-full flex items-center justify-between p-3 rounded-xl bg-red-500/10 hover:bg-red-500/15 border border-red-500/20 transition-colors text-left">
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-red-500/10 hover:bg-red-500/15 border border-red-500/20 transition-colors text-left"
+          >
             <div>
               <div className="text-sm font-medium text-red-400">Delete Account</div>
               <div className="text-xs text-white/30">Permanently delete your account and all data</div>
             </div>
+            <AlertTriangle className="w-4 h-4 text-red-400/50" />
           </button>
         </div>
       </div>
+
+      {showDeleteModal && (
+        <DeleteAccountModal
+          onClose={() => setShowDeleteModal(false)}
+          onDeleted={async () => {
+            setShowDeleteModal(false);
+            await logout();
+          }}
+        />
+      )}
     </div>
   );
 }

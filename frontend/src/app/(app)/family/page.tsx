@@ -18,11 +18,12 @@ import { SkeletonFamilyMember } from '@/components/ui/SkeletonLoader';
 import { useApi } from '@/hooks/useApi';
 import { familyService, APIFamilyDashboard, APIFamilyMember } from '@/lib/apiServices';
 import { normalizeError } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { FamilyMember } from '@/types';
 import {
   Users, Shield, X, Loader2, Copy, Check, AlertCircle,
   RefreshCw, ShieldCheck, Bell, Lock, ArrowRight,
-  CheckCircle2, Star, CreditCard, ServerCrash,
+  CheckCircle2, Star, CreditCard, ServerCrash, UserMinus, RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,10 +35,10 @@ function mapApiMember(m: APIFamilyMember): FamilyMember {
     id: m.id,
     name: m.user?.full_name ?? 'Unknown',
     email: m.user?.email ?? '',
-    role: m.role === 'parent' ? 'admin' : 'member',
+    role: m.role === 'parent' || m.role === 'guardian' ? 'admin' : 'member',
     protectionStatus: score >= 70 ? 'protected' : score >= 40 ? 'at-risk' : 'offline',
     safetyScore: Math.round(score),
-    joinedAt: new Date(),
+    joinedAt: m.joined_at ? new Date(m.joined_at) : new Date(),
     deviceCount: 1,
   };
 }
@@ -334,6 +335,76 @@ function FamilyOnboarding({
   );
 }
 
+// ─── Remove Member Modal ──────────────────────────────────
+
+function RemoveMemberModal({
+  member,
+  onClose,
+  onRemoved,
+}: {
+  member: FamilyMember;
+  onClose: () => void;
+  onRemoved: () => void;
+}) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRemove = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await familyService.removeMember(member.id);
+      onRemoved();
+      onClose();
+    } catch (err) {
+      setError(normalizeError(err).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md p-6 rounded-2xl bg-[#0e1628] border border-white/10 shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+              <UserMinus className="w-4 h-4 text-red-400" />
+            </div>
+            <h2 className="text-base font-bold text-white">Remove Member</h2>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="text-sm text-white/50 mb-4">
+          Are you sure you want to remove <span className="text-white font-semibold">{member.name}</span> from your family group? They will lose access to family features.
+        </p>
+        {error && (
+          <div className="mb-4 flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            {error}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm hover:bg-white/5 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleRemove}
+            disabled={isLoading}
+            className="flex-1 py-2.5 rounded-xl bg-red-500/90 text-white font-bold text-sm hover:bg-red-500 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserMinus className="w-4 h-4" />}
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Differentiated Error States ─────────────────────────
 
 function UnauthorizedState({ onRetry }: { onRetry: () => void }) {
@@ -414,7 +485,14 @@ function ServerErrorState({ onRetry }: { onRetry: () => void }) {
 // ─── Main Page ────────────────────────────────────────────
 
 export default function FamilyPage() {
+  const { user } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<FamilyMember | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  const isAdmin = user?.account_type === 'family_admin';
 
   const fetchDashboard = useCallback(() => familyService.getDashboard(), []);
   const fetchMembers   = useCallback(() => familyService.getMembers(), []);
@@ -437,7 +515,21 @@ export default function FamilyPage() {
   const handleRefresh = useCallback(() => {
     refetchDashboard();
     refetchMembers();
+    setInviteCode(null);
   }, [refetchDashboard, refetchMembers]);
+
+  const handleRegenerateInvite = async () => {
+    setIsRegenerating(true);
+    setRegenerateError(null);
+    try {
+      const result = await familyService.regenerateInviteCode();
+      setInviteCode(result.invite_code);
+    } catch (err) {
+      setRegenerateError(normalizeError(err).message);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   // ── Classify errors ──────────────────────────────────
   const hasNoFamily =
@@ -509,7 +601,7 @@ export default function FamilyPage() {
   // ── Happy path ───────────────────────────────────────
   const members: FamilyMember[] = (membersData ?? []).map(mapApiMember);
   const familyScore        = Math.round(dashboard?.average_safety_score ?? 0);
-  const inviteCode         = dashboard?.group?.invite_code ?? '';
+  const currentInviteCode  = inviteCode ?? dashboard?.group?.invite_code ?? '';
   const groupName          = dashboard?.group?.name ?? 'My Family';
   const totalScansThisMonth = dashboard?.total_scans_this_month ?? 0;
   const threatsThisMonth   = dashboard?.threats_this_month ?? 0;
@@ -528,10 +620,20 @@ export default function FamilyPage() {
           <p className="text-sm text-white/40">{groupName} · Monitor and protect every member</p>
         </div>
         <div className="flex items-center gap-2">
-          {inviteCode && (
+          {currentInviteCode && (
             <div className="hidden sm:block">
-              <InviteCodeBadge code={inviteCode} />
+              <InviteCodeBadge code={currentInviteCode} />
             </div>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handleRegenerateInvite}
+              disabled={isRegenerating}
+              title="Regenerate invite code"
+              className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-yellow-400 transition-colors disabled:opacity-50"
+            >
+              {isRegenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            </button>
           )}
           <button
             onClick={handleRefresh}
@@ -541,6 +643,12 @@ export default function FamilyPage() {
           </button>
         </div>
       </div>
+      {regenerateError && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {regenerateError}
+        </div>
+      )}
 
       {/* Family Score Banner */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-cyan-500/15 to-emerald-500/10 border border-cyan-500/20 flex items-center gap-5">
@@ -591,16 +699,27 @@ export default function FamilyPage() {
             <Users className="w-4 h-4 text-white/40" />
             <h2 className="text-sm font-semibold text-white">{members.length} Members</h2>
           </div>
-          {inviteCode && (
+          {currentInviteCode && (
             <div className="sm:hidden">
-              <InviteCodeBadge code={inviteCode} />
+              <InviteCodeBadge code={currentInviteCode} />
             </div>
           )}
         </div>
         {members.length > 0 ? (
           <div className="space-y-3">
             {members.map((member) => (
-              <FamilyMemberCard key={member.id} member={member} />
+              <div key={member.id} className="relative group">
+                <FamilyMemberCard member={member} />
+                {isAdmin && member.role !== 'admin' && (
+                  <button
+                    onClick={() => setMemberToRemove(member)}
+                    className="absolute top-3 right-3 w-7 h-7 rounded-lg bg-red-500/0 group-hover:bg-red-500/10 border border-transparent group-hover:border-red-500/20 flex items-center justify-center text-white/0 group-hover:text-red-400 transition-all"
+                    title="Remove member"
+                  >
+                    <UserMinus className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         ) : (
@@ -616,6 +735,14 @@ export default function FamilyPage() {
         <CreateFamilyModal
           onClose={() => setShowCreateModal(false)}
           onCreated={handleRefresh}
+        />
+      )}
+
+      {memberToRemove && (
+        <RemoveMemberModal
+          member={memberToRemove}
+          onClose={() => setMemberToRemove(null)}
+          onRemoved={handleRefresh}
         />
       )}
     </div>

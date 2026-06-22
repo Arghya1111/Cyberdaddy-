@@ -14,7 +14,7 @@ import { SkeletonRow } from '@/components/ui/SkeletonLoader';
 import { Scan } from '@/types';
 import {
   History, Search, Filter, ChevronLeft, ChevronRight, RefreshCw,
-  Shield, Loader2,
+  Shield, Loader2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -63,7 +63,7 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [riskFilter, setRiskFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [inputValue, setInputValue] = useState('');
 
   const fetchHistory = useCallback(
@@ -71,9 +71,10 @@ export default function HistoryPage() {
       page,
       risk_level: riskFilter || undefined,
       scan_type: typeFilter || undefined,
+      search: searchQuery || undefined,
       ordering: '-created_at',
     }),
-    [page, riskFilter, typeFilter]
+    [page, riskFilter, typeFilter, searchQuery]
   );
 
   const {
@@ -81,11 +82,18 @@ export default function HistoryPage() {
     isLoading,
     error,
     refetch,
-  } = useApi<PaginatedResponse<APIScanListItem>>(fetchHistory, { deps: [page, riskFilter, typeFilter] });
+  } = useApi<PaginatedResponse<APIScanListItem>>(fetchHistory, { deps: [page, riskFilter, typeFilter, searchQuery] });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setSearchQuery(inputValue);
+    setPage(1);
+    setSearchQuery(inputValue.trim());
+  };
+
+  const handleSearchClear = () => {
+    setInputValue('');
+    setSearchQuery('');
+    setPage(1);
   };
 
   const handleFilterChange = (type: 'risk' | 'scantype', value: string) => {
@@ -115,7 +123,7 @@ export default function HistoryPage() {
         </div>
         <div className="flex items-center gap-2">
           {/* Search */}
-          <form onSubmit={handleSearch} className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/30">
+          <form onSubmit={handleSearch} className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/30 focus-within:border-white/20">
             <Search className="w-4 h-4 flex-shrink-0" />
             <input
               type="text"
@@ -124,6 +132,11 @@ export default function HistoryPage() {
               placeholder="Search scans..."
               className="bg-transparent text-sm outline-none placeholder:text-white/30 w-36 text-white"
             />
+            {inputValue && (
+              <button type="button" onClick={handleSearchClear} className="text-white/30 hover:text-white/60 transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </form>
           <button
             onClick={refetch}
@@ -210,8 +223,8 @@ export default function HistoryPage() {
           <Shield className="w-12 h-12 text-white/10 mb-4" />
           <h3 className="text-white font-semibold mb-1">No scans found</h3>
           <p className="text-sm text-white/30">
-            {riskFilter || typeFilter
-              ? 'Try changing the filters to see more results.'
+            {riskFilter || typeFilter || searchQuery
+              ? 'Try changing the filters or search query to see more results.'
               : 'Start by scanning a suspicious message or screenshot in the chat.'}
           </p>
         </div>

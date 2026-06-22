@@ -9,8 +9,8 @@
 //     if you want to hit the backend directly.
 // ============================================================
 
-import axios, { AxiosError, type AxiosInstance } from 'axios';
-import { getAccessToken, clearTokens } from './auth';
+import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import { getAccessToken, getRefreshToken, setTokens, clearTokens } from './auth';
 
 // ─── APIError ─────────────────────────────────────────────
 
@@ -100,14 +100,92 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Response interceptor — normalise errors ───────────────
+// ── Response interceptor — token refresh on 401 ──────────
+//
+// Strategy:
+//   1. If a request returns 401, attempt one silent refresh using the
+//      stored refresh token.
+//   2. On success: store the new access token, replay the original request.
+//   3. On failure (refresh also 401/expired): clear tokens so the user
+//      gets sent to login.
+//   We use a flag (_retry) on the config to prevent infinite loops.
+
+let isRefreshing = false;
+// Queue of { resolve, reject } for requests waiting on a refresh
+type RefreshSubscriber = (token: string | null) => void;
+const refreshSubscribers: RefreshSubscriber[] = [];
+
+function subscribeTokenRefresh(cb: RefreshSubscriber) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string | null) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers.length = 0;
+}
+
+interface RetryConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid — clear local session
-      clearTokens();
+  async (error: AxiosError) => {
+    const originalRequest = error.config as RetryConfig | undefined;
+
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      const refreshToken = getRefreshToken();
+
+      if (!refreshToken) {
+        clearTokens();
+        return Promise.reject(normalizeError(error));
+      }
+
+      if (isRefreshing) {
+        // Another request is already refreshing — queue this one
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh((newToken) => {
+            if (!newToken || !originalRequest) {
+              reject(normalizeError(error));
+              return;
+            }
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            resolve(apiClient(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Call refresh endpoint directly (avoid interceptor loop)
+        const { data } = await axios.post<{ access: string; refresh?: string }>(
+          `${apiClient.defaults.baseURL}/users/auth/token/refresh/`,
+          { refresh: refreshToken },
+        );
+
+        const newAccess = data.access;
+        const newRefresh = data.refresh ?? refreshToken;
+        setTokens(newAccess, newRefresh);
+
+        onRefreshed(newAccess);
+        isRefreshing = false;
+
+        originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+        return apiClient(originalRequest);
+      } catch {
+        isRefreshing = false;
+        onRefreshed(null);
+        clearTokens();
+        // Redirect to login only in browser context
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(normalizeError(error));
+      }
     }
+
     return Promise.reject(normalizeError(error));
   }
 );
