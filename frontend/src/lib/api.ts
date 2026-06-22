@@ -32,13 +32,22 @@ export function normalizeError(err: unknown): APIError {
   if (err instanceof APIError) return err;
 
   if (axios.isAxiosError(err)) {
-    const axiosErr = err as AxiosError<{ detail?: string; message?: string; non_field_errors?: string[] }>;
+    const axiosErr = err as AxiosError<{
+      detail?: string;
+      message?: string;
+      non_field_errors?: string[];
+      // Nested error shape used by family/scam endpoints: { success: false, error: { message: "..." } }
+      error?: { message?: string };
+      success?: boolean;
+    }>;
     const status = axiosErr.response?.status;
     const responseData = axiosErr.response?.data;
 
     let message = 'An unexpected error occurred.';
     if (responseData?.detail) {
       message = responseData.detail;
+    } else if (responseData?.error?.message) {
+      message = responseData.error.message;
     } else if (responseData?.message) {
       message = responseData.message;
     } else if (responseData?.non_field_errors?.length) {
