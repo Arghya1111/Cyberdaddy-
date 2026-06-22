@@ -29,16 +29,26 @@ class CyberDaddyTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        # Check for unverified email BEFORE calling super() so we can return
+        # a helpful message instead of the generic "No active account found".
+        email = attrs.get(self.username_field, "")
+        try:
+            pre_user = User.objects.get(email=email)
+            if not pre_user.is_email_verified and not pre_user.is_active:
+                raise serializers.ValidationError(
+                    "Please verify your email before logging in."
+                )
+        except User.DoesNotExist:
+            pass  # Wrong email — let super().validate() raise the standard error
+
         data = super().validate(attrs)
         user = self.user
 
-        # Reject login for non-active accounts
         if user.account_status == User.AccountStatus.SUSPENDED:
             raise serializers.ValidationError(
                 "Your account has been suspended. Contact support@cyberdaddy.in"
             )
 
-        # Add user info to response alongside tokens
         data["user"] = UserProfileSerializer(user).data
         return data
 
@@ -110,6 +120,10 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
 # ============================================================
 class EmailVerificationSerializer(serializers.Serializer):
     token = serializers.CharField(required=True)
+
+
+class ResendVerificationEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
 
 
 class RequestPasswordResetSerializer(serializers.Serializer):

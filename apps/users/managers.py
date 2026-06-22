@@ -16,7 +16,8 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("Users must have an email address")
         email = self.normalize_email(email)
-        extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault("is_active", False)
+        extra_fields.setdefault("is_email_verified", False)
         extra_fields.setdefault("account_status", "pending_verification")
         user = self.model(email=email, **extra_fields)
         if password:

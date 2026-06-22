@@ -24,6 +24,7 @@ from .serializers import (
     UserProfileSerializer,
     UserProfileUpdateSerializer,
     EmailVerificationSerializer,
+    ResendVerificationEmailSerializer,
     RequestPasswordResetSerializer,
     ConfirmPasswordResetSerializer,
     ChangePasswordSerializer,
@@ -145,14 +146,14 @@ class LogoutAllView(APIView):
 
 class VerifyEmailView(APIView):
     """
-    POST /api/v1/auth/verify-email/
-    Verify user email using the token from the verification link.
+    POST /api/v1/users/auth/verify-email/
+    Verify user email using the token submitted in the request body.
     """
     permission_classes = [AllowAny]
 
     @extend_schema(
         tags=["Auth"],
-        summary="Verify user email address",
+        summary="Verify user email address (body token)",
         request=EmailVerificationSerializer,
         responses={200: MessageSerializer, 400: ErrorResponseSerializer},
     )
@@ -169,34 +170,71 @@ class VerifyEmailView(APIView):
             )
 
 
+class VerifyEmailByTokenView(APIView):
+    """
+    GET /api/v1/users/verify-email/<token>/
+    Verify user email via a URL path token (used in email links).
+    One-time use, expiring token — sets is_email_verified=True and is_active=True.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Auth"],
+        summary="Verify user email address (URL token)",
+        responses={200: MessageSerializer, 400: ErrorResponseSerializer},
+    )
+    def get(self, request, token):
+        try:
+            AuthService.verify_email(token)
+            return Response({"success": True, "message": "Email verified successfully. You can now log in."})
+        except ValueError as e:
+            return Response(
+                {"success": False, "error": {"message": str(e)}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
 class ResendVerificationEmailView(APIView):
     """
-    POST /api/v1/auth/resend-verification/
-    Resend email verification link to the authenticated user.
+    POST /api/v1/users/auth/resend-verification/
+    Resend email verification link. Accepts email in request body.
+    No authentication required — unverified users cannot obtain a JWT token.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @extend_schema(
         tags=["Auth"],
         summary="Resend email verification",
-        request=None,
+        request=ResendVerificationEmailSerializer,
         responses={200: MessageSerializer, 400: ErrorResponseSerializer},
     )
     def post(self, request):
-        if request.user.is_email_verified:
+        serializer = ResendVerificationEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Always return 200 to prevent email enumeration
+            return Response({"success": True, "message": "If this email is registered and unverified, a verification email has been sent."})
+
+        if user.is_email_verified:
             return Response(
-                {"success": False, "error": {"message": "Email already verified."}},
+                {"success": False, "error": {"message": "This email address is already verified."}},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         from apps.users.tasks import send_email_verification_task
         if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
             try:
-                send_email_verification_task(str(request.user.id))
+                send_email_verification_task(str(user.id))
             except Exception as exc:
                 logger.warning(f"Resend verification email failed (non-critical): {exc}")
         else:
-            send_email_verification_task.delay(str(request.user.id))
-        return Response({"success": True, "message": "Verification email sent."})
+            send_email_verification_task.delay(str(user.id))
+
+        return Response({"success": True, "message": "Verification email sent. Please check your inbox."})
 
 
 class RequestPasswordResetView(APIView):

@@ -14,15 +14,18 @@ class EmailService:
 
     @staticmethod
     def send_templated_email(to_email: str, subject: str, template: str, context: dict):
-        """Send a templated HTML email."""
+        """Send a templated HTML email. The .txt version is optional."""
         try:
             from django.template.loader import render_to_string
             from django.core.mail import EmailMultiAlternatives
 
             html_content = render_to_string(template, context)
-            text_content = render_to_string(
-                template.replace(".html", ".txt"), context
-            ) if template else ""
+
+            # .txt template is optional — fall back to empty plain text body
+            try:
+                text_content = render_to_string(template.replace(".html", ".txt"), context)
+            except Exception:
+                text_content = ""
 
             email = EmailMultiAlternatives(
                 subject=subject,

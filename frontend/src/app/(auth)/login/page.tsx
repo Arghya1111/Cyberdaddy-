@@ -9,8 +9,11 @@ import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2, AlertCircle, Mail, ExternalLink } from 'lucide-react';
 import { normalizeError } from '@/lib/api';
+import { authService } from '@/lib/apiServices';
+
+const UNVERIFIED_MSG = 'Please verify your email before logging in.';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,6 +25,10 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [slowRequest, setSlowRequest] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUnverified, setIsUnverified] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,6 +37,8 @@ export default function LoginPage() {
     setIsLoading(true);
     setSlowRequest(false);
     setError(null);
+    setIsUnverified(false);
+    setResendMessage(null);
 
     const slowTimer = setTimeout(() => setSlowRequest(true), 8_000);
 
@@ -38,11 +47,31 @@ export default function LoginPage() {
       router.replace('/dashboard');
     } catch (err) {
       const normalized = normalizeError(err);
-      setError(normalized.message || 'Login failed. Please check your credentials.');
+      const msg = normalized.message || 'Login failed. Please check your credentials.';
+      setError(msg);
+      if (msg.toLowerCase().includes('verify your email')) {
+        setIsUnverified(true);
+      }
     } finally {
       clearTimeout(slowTimer);
       setSlowRequest(false);
       setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!email.trim()) return;
+    setResendLoading(true);
+    setResendError(null);
+    setResendMessage(null);
+    try {
+      const res = await authService.resendVerificationEmail(email.trim());
+      setResendMessage(res.message || 'Verification email sent!');
+    } catch (err) {
+      const normalized = normalizeError(err);
+      setResendError(normalized.message || 'Could not resend email. Try again.');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -70,8 +99,53 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Error */}
-        {error && (
+        {/* Unverified email error — special UI */}
+        {error && isUnverified && (
+          <div className="mb-5 space-y-3">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
+              <Mail className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold mb-1">Email not verified</p>
+                <p className="text-amber-400/70">
+                  {UNVERIFIED_MSG} Check your inbox for the verification link.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <a
+                href="https://mail.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 font-semibold text-sm hover:bg-white/10 hover:text-white transition-all"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open Gmail
+              </a>
+              <button
+                type="button"
+                disabled={resendLoading}
+                onClick={handleResend}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 font-semibold text-sm hover:bg-white/10 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {resendLoading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                ) : (
+                  <><Mail className="w-4 h-4" /> Resend Verification Email</>
+                )}
+              </button>
+              {resendMessage && (
+                <p className="text-emerald-400 text-xs text-center">{resendMessage}</p>
+              )}
+              {resendError && (
+                <p className="text-red-400 text-xs text-center">{resendError}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Generic error */}
+        {error && !isUnverified && (
           <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span>{error}</span>

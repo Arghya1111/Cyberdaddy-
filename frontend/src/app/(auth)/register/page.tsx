@@ -8,8 +8,9 @@
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, Mail, ExternalLink } from 'lucide-react';
 import { normalizeError } from '@/lib/api';
+import { authService } from '@/lib/apiServices';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -26,6 +27,10 @@ export default function RegisterPage() {
   const [slowRequest, setSlowRequest] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [registeredEmail, setRegisteredEmail] = useState<string>('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -47,8 +52,9 @@ export default function RegisterPage() {
     const slowTimer = setTimeout(() => setSlowRequest(true), 8_000);
 
     try {
+      const emailTrimmed = formData.email.trim();
       const result = await register({
-        email: formData.email.trim(),
+        email: emailTrimmed,
         full_name: formData.full_name.trim(),
         phone_number: formData.phone_number.trim() || undefined,
         password: formData.password,
@@ -56,7 +62,8 @@ export default function RegisterPage() {
       });
 
       if (result.success) {
-        setSuccess('Account created! Please check your email to verify your account before logging in.');
+        setRegisteredEmail(emailTrimmed);
+        setSuccess('Verification email sent.');
         setFormData({ full_name: '', email: '', phone_number: '', password: '', confirm_password: '' });
       }
     } catch (err) {
@@ -86,15 +93,75 @@ export default function RegisterPage() {
 
         {/* Success Message */}
         {success && (
-          <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold mb-1">Account created successfully!</p>
-              <p className="text-emerald-400/70">{success}</p>
-              <Link href="/login" className="mt-2 inline-block font-semibold underline hover:no-underline">
-                Sign in now →
-              </Link>
+          <div className="mb-5 space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold mb-1">Account created successfully!</p>
+                <p className="text-emerald-400/70">{success}</p>
+                {registeredEmail && (
+                  <p className="text-emerald-400/50 text-xs mt-1">
+                    Sent to: <span className="text-emerald-400">{registeredEmail}</span>
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* Action buttons */}
+            <div className="space-y-2">
+              {/* Open Gmail */}
+              <a
+                href="https://mail.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-black font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open Gmail
+              </a>
+
+              {/* Resend Verification Email */}
+              <button
+                type="button"
+                disabled={resendLoading}
+                onClick={async () => {
+                  if (!registeredEmail) return;
+                  setResendLoading(true);
+                  setResendError(null);
+                  setResendMessage(null);
+                  try {
+                    const res = await authService.resendVerificationEmail(registeredEmail);
+                    setResendMessage(res.message || 'Verification email resent!');
+                  } catch (err) {
+                    const normalized = normalizeError(err);
+                    setResendError(normalized.message || 'Could not resend email. Try again.');
+                  } finally {
+                    setResendLoading(false);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-white/5 border border-white/10 text-white/70 font-semibold text-sm hover:bg-white/10 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {resendLoading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                ) : (
+                  <><Mail className="w-4 h-4" /> Resend Verification Email</>
+                )}
+              </button>
+
+              {resendMessage && (
+                <p className="text-emerald-400 text-xs text-center">{resendMessage}</p>
+              )}
+              {resendError && (
+                <p className="text-red-400 text-xs text-center">{resendError}</p>
+              )}
+            </div>
+
+            <p className="text-center text-xs text-white/30 pt-1">
+              Already verified?{' '}
+              <Link href="/login" className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors">
+                Sign in →
+              </Link>
+            </p>
           </div>
         )}
 

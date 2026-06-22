@@ -45,8 +45,9 @@ class UserService:
         from django.conf import settings as _settings
         if getattr(_settings, 'DEV_AUTO_VERIFY_EMAIL', False):
             user.is_email_verified = True
+            user.is_active = True
             user.account_status = User.AccountStatus.ACTIVE
-            user.save(update_fields=["is_email_verified", "account_status"])
+            user.save(update_fields=["is_email_verified", "is_active", "account_status"])
             logger.info(f"DEV_AUTO_VERIFY_EMAIL: auto-verified {user.email}")
         else:
             # Send verification email — synchronous on PythonAnywhere (console backend),
@@ -140,10 +141,11 @@ class AuthService:
 
         user = auth_record.user
         user.is_email_verified = True
+        user.is_active = True
         user.account_status = User.AccountStatus.ACTIVE
-        user.save(update_fields=["is_email_verified", "account_status"])
+        user.save(update_fields=["is_email_verified", "is_active", "account_status"])
 
-        # Mark token as used
+        # Mark token as used (one-time use)
         auth_record.token_used_at = timezone.now()
         auth_record.save(update_fields=["token_used_at"])
 

@@ -57,6 +57,16 @@ export interface APIRegisterResponse {
 
 // ─── Auth Service ─────────────────────────────────────────
 
+export interface APIVerifyEmailResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface APIResendVerificationResponse {
+  success: boolean;
+  message: string;
+}
+
 export const authService = {
   async login(email: string, password: string): Promise<APILoginResponse> {
     const { data } = await apiClient.post<APILoginResponse>('/users/auth/login/', { email, password });
@@ -76,6 +86,21 @@ export const authService = {
 
   async logout(refresh: string): Promise<void> {
     await apiClient.post('/users/auth/logout/', { refresh });
+  },
+
+  /** Verify email using the token from the verification link URL. */
+  async verifyEmail(token: string): Promise<APIVerifyEmailResponse> {
+    const { data } = await apiClient.get<APIVerifyEmailResponse>(`/users/verify-email/${token}/`);
+    return data;
+  },
+
+  /** Resend verification email to the given address (no auth required). */
+  async resendVerificationEmail(email: string): Promise<APIResendVerificationResponse> {
+    const { data } = await apiClient.post<APIResendVerificationResponse>(
+      '/users/auth/resend-verification/',
+      { email },
+    );
+    return data;
   },
 };
 

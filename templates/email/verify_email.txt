@@ -1,0 +1,15 @@
+Hi {{ user_name }},
+
+Thanks for signing up for CyberDaddy — your AI-powered family cybersecurity platform.
+
+Please verify your email address by clicking the link below:
+
+{{ verification_url }}
+
+This link expires in {{ expiry_hours }} hour{{ expiry_hours|pluralize }} and can only be used once.
+
+If you didn't create a CyberDaddy account, you can safely ignore this email.
+
+---
+CyberDaddy
+support@cyberdaddy.in
