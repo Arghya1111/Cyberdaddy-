@@ -275,6 +275,64 @@ class RegenerateInviteCodeView(APIView):
         })
 
 
+class SendFamilyInviteEmailView(APIView):
+    """
+    POST /api/v1/family/invite/send/
+    Send the current family invite code to a given email address.
+    Requires the caller to be the family group admin.
+    """
+    permission_classes = [IsAuthenticated, IsFamilyAdmin]
+
+    @extend_schema(
+        tags=["Family"],
+        summary="Send family invite via email",
+        request=inline_serializer(
+            name="SendFamilyInviteEmailRequest",
+            fields={"email": serializers.EmailField()},
+        ),
+        responses={
+            200: inline_serializer(
+                name="SendFamilyInviteEmailResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                },
+            ),
+            400: ErrorResponseSerializer,
+        },
+    )
+    def post(self, request):
+        to_email = request.data.get("email", "").strip().lower()
+        if not to_email:
+            return Response(
+                {"success": False, "error": {"message": "An email address is required."}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        group = request.user.managed_family_group
+
+        from apps.family.tasks import send_family_invite_email_task
+        from django.conf import settings as _settings
+        kwargs = dict(
+            to_email=to_email,
+            inviter_name=request.user.full_name,
+            group_name=group.name,
+            invite_code=group.invite_code,
+        )
+        if getattr(_settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+            try:
+                send_family_invite_email_task(**kwargs)
+            except Exception as exc:
+                logger.warning(f"Family invite email failed (non-critical): {exc}")
+        else:
+            send_family_invite_email_task.delay(**kwargs)
+
+        return Response({
+            "success": True,
+            "message": f"Invite email sent to {to_email}.",
+        })
+
+
 class FamilyDashboardView(APIView):
     """
     GET /api/v1/family/dashboard/

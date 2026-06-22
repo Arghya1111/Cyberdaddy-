@@ -7,7 +7,8 @@ from .views import (
     CreateFamilyGroupView, FamilyGroupDetailView,
     JoinFamilyGroupView, FamilyMembersListView,
     UpdateMemberRoleView, RemoveMemberView,
-    RegenerateInviteCodeView, FamilyDashboardView,
+    RegenerateInviteCodeView, SendFamilyInviteEmailView,
+    FamilyDashboardView,
 )
 
 app_name = "family"
@@ -20,5 +21,6 @@ urlpatterns = [
     path("members/<uuid:pk>/", UpdateMemberRoleView.as_view(), name="update-member"),
     path("members/<uuid:pk>/remove/", RemoveMemberView.as_view(), name="remove-member"),
     path("invite/regenerate/", RegenerateInviteCodeView.as_view(), name="regenerate-invite"),
+    path("invite/send/", SendFamilyInviteEmailView.as_view(), name="send-invite-email"),
     path("dashboard/", FamilyDashboardView.as_view(), name="dashboard"),
 ]

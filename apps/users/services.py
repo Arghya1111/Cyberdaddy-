@@ -150,6 +150,19 @@ class AuthService:
         auth_record.save(update_fields=["token_used_at"])
 
         logger.info(f"Email verified for user: {user.email}")
+
+        # Send welcome email now that the account is active
+        from apps.users.tasks import send_welcome_email_task
+        from django.conf import settings as _settings
+        if not getattr(_settings, 'DEV_AUTO_VERIFY_EMAIL', False):
+            if getattr(_settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+                try:
+                    send_welcome_email_task(str(user.id))
+                except Exception as exc:
+                    logger.warning(f"Welcome email failed (non-critical): {exc}")
+            else:
+                send_welcome_email_task.delay(str(user.id))
+
         return user
 
     @classmethod

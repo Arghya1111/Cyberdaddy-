@@ -335,6 +335,14 @@ export const familyService = {
     );
     return { invite_code: data.invite_code };
   },
+
+  async sendInviteEmail(email: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>(
+      '/family/invite/send/',
+      { email },
+    );
+    return data;
+  },
 };
 
 // ─── Notification Types ───────────────────────────────────

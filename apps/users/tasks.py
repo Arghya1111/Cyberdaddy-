@@ -85,6 +85,38 @@ def send_password_reset_email_task(self, user_id: str, raw_token: str):
 
 
 @shared_task(
+    bind=True,
+    name="apps.users.tasks.send_welcome_email_task",
+    max_retries=3,
+    default_retry_delay=60,
+    queue="notifications",
+)
+def send_welcome_email_task(self, user_id: str):
+    """Send a welcome email after the user successfully verifies their email address."""
+    try:
+        from apps.users.models import User
+        from apps.notifications.services import EmailService
+
+        user = User.objects.get(id=user_id)
+        dashboard_url = f"{settings.FRONTEND_URL}/dashboard"
+
+        EmailService.send_templated_email(
+            to_email=user.email,
+            subject="Welcome to CyberDaddy — you're protected! 🛡️",
+            template="email/welcome.html",
+            context={
+                "user_name": user.full_name,
+                "dashboard_url": dashboard_url,
+            },
+        )
+        logger.info(f"Welcome email sent to: {user.email}")
+
+    except Exception as exc:
+        logger.error(f"Failed to send welcome email for user {user_id}: {exc}")
+        raise self.retry(exc=exc)
+
+
+@shared_task(
     name="apps.users.tasks.cleanup_expired_sessions",
     queue="default",
 )

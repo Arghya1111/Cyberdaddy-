@@ -1,0 +1,18 @@
+You're invited to join {{ group_name }}'s Family Circle on CyberDaddy!
+
+{{ inviter_name }} has invited you to join their family group on CyberDaddy — the AI-powered
+platform that keeps families safe from scams, phishing, and online threats.
+
+Your Invite Code:  {{ invite_code }}
+
+How to join:
+  1. Go to: {{ join_url }}
+  2. Create your free CyberDaddy account
+  3. Navigate to Family Circle and enter invite code: {{ invite_code }}
+
+This invite code expires in {{ expiry_hours }} hour(s).
+If it expires, ask {{ inviter_name }} to generate a new one.
+
+---
+If you don't know {{ inviter_name }} or didn't expect this, you can safely ignore this email.
+© CyberDaddy · support@cyberdaddy.in

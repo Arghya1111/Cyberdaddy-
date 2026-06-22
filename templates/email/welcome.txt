@@ -1,0 +1,19 @@
+Welcome to CyberDaddy, {{ user_name }}!
+
+Your account is now fully verified and active.
+
+You're all set to protect yourself and your family from scams, phishing, and digital threats in real time.
+
+What you can do now:
+  🔍 AI Scam Detection — analyse screenshots, URLs, SMS, and emails instantly.
+  👨‍👩‍👧 Family Circle — create or join a family group to monitor everyone's safety.
+  📊 Safety Dashboard — track your safety score, threat history, and AI insights.
+  🔔 Real-time Alerts — get notified the moment a threat is detected.
+
+Go to your dashboard:
+{{ dashboard_url }}
+
+Need help? Email us at support@cyberdaddy.in — we're always here.
+
+---
+© CyberDaddy · support@cyberdaddy.in
