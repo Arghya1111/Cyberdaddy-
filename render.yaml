@@ -26,10 +26,20 @@ services:
         generateValue: true
       - key: DEBUG
         value: "False"
+      # Both the Render-generated URL and the actual service URL are listed
+      # so requests are accepted regardless of which hostname Render uses.
       - key: ALLOWED_HOSTS
-        value: cyberdaddy-api.onrender.com
+        value: cyberdaddy.onrender.com,cyberdaddy-api.onrender.com
+      # The Vercel frontend origin — used by CorsMiddleware for cross-origin requests.
+      # CORS_ALLOWED_ORIGINS is also auto-extended with FRONTEND_URL in base.py.
       - key: CORS_ALLOWED_ORIGINS
-        value: https://cyberdaddy.in
+        value: https://frontend-inky-nine-25.vercel.app
+      # Django CsrfViewMiddleware must trust the same origin for admin/session forms.
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://frontend-inky-nine-25.vercel.app
+      # Used by email verification links and other frontend redirects.
+      - key: FRONTEND_URL
+        value: https://frontend-inky-nine-25.vercel.app
       - key: DATABASE_URL
         fromDatabase:
           name: cyberdaddy-db

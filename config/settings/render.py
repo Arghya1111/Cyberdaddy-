@@ -100,6 +100,13 @@ LOGGING = {
             "level": "ERROR",
             "propagate": False,
         },
+        # Log every CORS check at DEBUG level — helps diagnose mismatched
+        # origins without adding custom middleware.
+        "corsheaders": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
         "apps": {
             "handlers": ["console"],
             "level": "INFO",

@@ -368,9 +368,28 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ============================================================
+# Application-Specific Settings
+# (defined early so CORS/CSRF sections below can reference FRONTEND_URL)
+# ============================================================
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
+INVITE_CODE_EXPIRY_HOURS = config("INVITE_CODE_EXPIRY_HOURS", default=48, cast=int)
+MAX_FAMILY_MEMBERS = config("MAX_FAMILY_MEMBERS", default=10, cast=int)
+SCAN_FILE_MAX_SIZE_MB = 10
+EMAIL_VERIFICATION_EXPIRY_HOURS = 24
+PASSWORD_RESET_EXPIRY_HOURS = 2
+OTP_EXPIRY_MINUTES = 10
+
+# ============================================================
 # CORS Configuration
 # ============================================================
-CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:3000", cast=Csv())
+# CORS_ALLOWED_ORIGINS always includes FRONTEND_URL so the frontend
+# origin is allowed even when only FRONTEND_URL is set in the env.
+# Add extra origins (comma-separated) via the CORS_ALLOWED_ORIGINS
+# environment variable, e.g. "https://staging.example.com,https://app.example.com".
+_cors_from_env = [o.strip() for o in config("CORS_ALLOWED_ORIGINS", default="", cast=Csv()) if o.strip()]
+_cors_defaults = {"http://localhost:3000", "http://127.0.0.1:3000", FRONTEND_URL}
+CORS_ALLOWED_ORIGINS = sorted(_cors_defaults | set(_cors_from_env))
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     "accept",
@@ -384,6 +403,23 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
     "x-request-id",
 ]
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+# CSRF: Django's CsrfViewMiddleware must trust the frontend origin.
+# JWT API endpoints don't use CSRF cookies, but the admin + session-auth
+# forms do.  Always include FRONTEND_URL so those work in all environments.
+_csrf_from_env = [o.strip() for o in config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv()) if o.strip()]
+CSRF_TRUSTED_ORIGINS = sorted(
+    {"http://localhost:3000", "http://127.0.0.1:3000", FRONTEND_URL}
+    | set(_csrf_from_env)
+)
 
 # ============================================================
 # Celery Configuration
@@ -482,13 +518,3 @@ GROQ_API_KEY = config("GROQ_API_KEY", default="")
 # ============================================================
 FIREBASE_CREDENTIALS_PATH = config("FIREBASE_CREDENTIALS_PATH", default="")
 
-# ============================================================
-# Application-Specific Settings
-# ============================================================
-FRONTEND_URL = config("FRONTEND_URL", default="https://cyberdaddy.in")
-INVITE_CODE_EXPIRY_HOURS = config("INVITE_CODE_EXPIRY_HOURS", default=48, cast=int)
-MAX_FAMILY_MEMBERS = config("MAX_FAMILY_MEMBERS", default=10, cast=int)
-SCAN_FILE_MAX_SIZE_MB = 10
-EMAIL_VERIFICATION_EXPIRY_HOURS = 24
-PASSWORD_RESET_EXPIRY_HOURS = 2
-OTP_EXPIRY_MINUTES = 10
