@@ -371,13 +371,20 @@ SPECTACULAR_SETTINGS = {
 # Application-Specific Settings
 # (defined early so CORS/CSRF sections below can reference FRONTEND_URL)
 # ============================================================
-FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
+# Strip any trailing slash — corsheaders E014 rejects origins with a path.
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000").rstrip("/")
 INVITE_CODE_EXPIRY_HOURS = config("INVITE_CODE_EXPIRY_HOURS", default=48, cast=int)
 MAX_FAMILY_MEMBERS = config("MAX_FAMILY_MEMBERS", default=10, cast=int)
 SCAN_FILE_MAX_SIZE_MB = 10
 EMAIL_VERIFICATION_EXPIRY_HOURS = 24
 PASSWORD_RESET_EXPIRY_HOURS = 2
 OTP_EXPIRY_MINUTES = 10
+
+
+def _clean_origin(url: str) -> str:
+    """Return the scheme+host portion of a URL, stripping any path or slash."""
+    return url.strip().rstrip("/")
+
 
 # ============================================================
 # CORS Configuration
@@ -386,8 +393,16 @@ OTP_EXPIRY_MINUTES = 10
 # origin is allowed even when only FRONTEND_URL is set in the env.
 # Add extra origins (comma-separated) via the CORS_ALLOWED_ORIGINS
 # environment variable, e.g. "https://staging.example.com,https://app.example.com".
-_cors_from_env = [o.strip() for o in config("CORS_ALLOWED_ORIGINS", default="", cast=Csv()) if o.strip()]
-_cors_defaults = {"http://localhost:3000", "http://127.0.0.1:3000", FRONTEND_URL}
+_cors_from_env = [
+    _clean_origin(o)
+    for o in config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
+    if o.strip()
+]
+_cors_defaults = {
+    _clean_origin("http://localhost:3000"),
+    _clean_origin("http://127.0.0.1:3000"),
+    FRONTEND_URL,
+}
 CORS_ALLOWED_ORIGINS = sorted(_cors_defaults | set(_cors_from_env))
 
 CORS_ALLOW_CREDENTIALS = True
@@ -415,9 +430,17 @@ CORS_ALLOW_METHODS = [
 # CSRF: Django's CsrfViewMiddleware must trust the frontend origin.
 # JWT API endpoints don't use CSRF cookies, but the admin + session-auth
 # forms do.  Always include FRONTEND_URL so those work in all environments.
-_csrf_from_env = [o.strip() for o in config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv()) if o.strip()]
+_csrf_from_env = [
+    _clean_origin(o)
+    for o in config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
+    if o.strip()
+]
 CSRF_TRUSTED_ORIGINS = sorted(
-    {"http://localhost:3000", "http://127.0.0.1:3000", FRONTEND_URL}
+    {
+        _clean_origin("http://localhost:3000"),
+        _clean_origin("http://127.0.0.1:3000"),
+        FRONTEND_URL,
+    }
     | set(_csrf_from_env)
 )
 
