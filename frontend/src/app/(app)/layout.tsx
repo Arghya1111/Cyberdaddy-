@@ -10,12 +10,16 @@
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
 import AuthGuard from '@/components/auth/AuthGuard';
+import EmailVerificationBanner from '@/components/ui/EmailVerificationBanner';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
       {/* Mobile Top Bar — only shows on small screens */}
       <TopBar />
+
+      {/* Email verification reminder — visible on all app pages when unverified */}
+      <EmailVerificationBanner />
 
       <div className="flex h-screen overflow-hidden">
         {/* Desktop Sidebar */}

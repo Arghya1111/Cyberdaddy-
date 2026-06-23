@@ -28,7 +28,7 @@ interface AuthContextValue {
     phone_number?: string;
     password: string;
     confirm_password: string;
-  }) => Promise<{ success: boolean; message: string }>;
+  }) => Promise<{ success: boolean; message: string; autoLoggedIn: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -121,6 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Register ───────────────────────────────────────────────
+  // Creates the account then immediately attempts auto-login so users land
+  // on the dashboard without a separate manual login step.
   const register = useCallback(async (payload: {
     email: string;
     full_name: string;
@@ -129,7 +131,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     confirm_password: string;
   }) => {
     const result = await authService.register(payload);
-    return { success: result.success, message: result.message };
+    if (!result.success) {
+      return { success: false, message: result.message, autoLoggedIn: false };
+    }
+
+    // Attempt silent auto-login immediately after registration.
+    try {
+      const loginResp = await authService.login(payload.email, payload.password);
+      setTokens(loginResp.access, loginResp.refresh);
+      setUser(loginResp.user);
+      setStoredUser({
+        id: loginResp.user.id,
+        email: loginResp.user.email,
+        full_name: loginResp.user.full_name,
+        account_type: loginResp.user.account_type,
+        account_status: loginResp.user.account_status,
+        is_email_verified: loginResp.user.is_email_verified,
+        safety_score: loginResp.user.safety_score,
+        avatar: loginResp.user.avatar,
+      });
+      return { success: true, message: result.message, autoLoggedIn: true };
+    } catch {
+      // Auto-login failed (e.g. email verification required in production).
+      // Fall back to the manual verification flow.
+      return { success: true, message: result.message, autoLoggedIn: false };
+    }
   }, []);
 
   // ── Logout ─────────────────────────────────────────────────
