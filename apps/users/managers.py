@@ -16,9 +16,18 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("Users must have an email address")
         email = self.normalize_email(email)
-        extra_fields.setdefault("is_active", False)
-        extra_fields.setdefault("is_email_verified", False)
-        extra_fields.setdefault("account_status", "pending_verification")
+
+        # TODO: Re-enable email verification in production
+        # When REQUIRE_EMAIL_VERIFICATION=False, start users as immediately
+        # active so they can log in without clicking a verification link.
+        from django.conf import settings
+        skip_verification = not getattr(settings, 'REQUIRE_EMAIL_VERIFICATION', True)
+        extra_fields.setdefault("is_active", True if skip_verification else False)
+        extra_fields.setdefault("is_email_verified", True if skip_verification else False)
+        extra_fields.setdefault(
+            "account_status",
+            "active" if skip_verification else "pending_verification",
+        )
         user = self.model(email=email, **extra_fields)
         if password:
             user.set_password(password)

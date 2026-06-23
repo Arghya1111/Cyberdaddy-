@@ -84,10 +84,15 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        # TODO: Re-enable email verification in production
+        if getattr(settings, 'REQUIRE_EMAIL_VERIFICATION', True):
+            message = "Account created. Please check your email to verify your account."
+        else:
+            message = "Account created successfully. You can now log in."
         return Response(
             {
                 "success": True,
-                "message": "Account created. Please check your email to verify your account.",
+                "message": message,
                 "user_id": str(user.id),
             },
             status=status.HTTP_201_CREATED,

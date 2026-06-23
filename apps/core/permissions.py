@@ -10,10 +10,19 @@ from apps.subscriptions.models import Subscription
 
 
 class IsEmailVerified(BasePermission):
-    """Allow access only to users with verified email addresses."""
+    """
+    Allow access only to users with verified email addresses.
+    # TODO: Re-enable email verification in production
+    When REQUIRE_EMAIL_VERIFICATION=False (dev/test) this gate is bypassed
+    entirely so all authenticated users can access protected endpoints.
+    """
     message = "Please verify your email address to access this feature."
 
     def has_permission(self, request, view):
+        from django.conf import settings
+        # TODO: Re-enable email verification in production
+        if not getattr(settings, 'REQUIRE_EMAIL_VERIFICATION', True):
+            return bool(request.user and request.user.is_authenticated)
         return bool(
             request.user and
             request.user.is_authenticated and

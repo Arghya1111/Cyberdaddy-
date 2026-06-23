@@ -31,6 +31,7 @@ class CyberDaddyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         from django.conf import settings as _settings
 
+        # TODO: Re-enable email verification in production
         # Only enforce the email-verification gate when the feature is enabled.
         # When REQUIRE_EMAIL_VERIFICATION=False (dev/test) users can log in
         # immediately after registration without clicking a verification link.
