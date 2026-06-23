@@ -41,14 +41,19 @@ class UserService:
         # Create email auth record
         UserAuth.objects.create(user=user, provider=UserAuth.AuthProvider.EMAIL, is_primary=True)
 
-        # Auto-verify email in local dev so scan endpoints work without real SMTP.
+        # Auto-verify when email verification is disabled (dev/test) or the
+        # legacy DEV_AUTO_VERIFY_EMAIL flag is set.
         from django.conf import settings as _settings
-        if getattr(_settings, 'DEV_AUTO_VERIFY_EMAIL', False):
+        skip_verification = (
+            not getattr(_settings, 'REQUIRE_EMAIL_VERIFICATION', True)
+            or getattr(_settings, 'DEV_AUTO_VERIFY_EMAIL', False)
+        )
+        if skip_verification:
             user.is_email_verified = True
             user.is_active = True
             user.account_status = User.AccountStatus.ACTIVE
             user.save(update_fields=["is_email_verified", "is_active", "account_status"])
-            logger.info(f"DEV_AUTO_VERIFY_EMAIL: auto-verified {user.email}")
+            logger.info(f"Email verification skipped (REQUIRE_EMAIL_VERIFICATION=False): {user.email}")
         else:
             # Send verification email — synchronous on PythonAnywhere (console backend),
             # async via Celery worker in full production.

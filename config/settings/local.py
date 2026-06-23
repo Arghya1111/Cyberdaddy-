@@ -28,9 +28,11 @@ CSRF_TRUSTED_ORIGINS = config(
 )
 
 # ============================================================
-# Dev convenience: auto-verify email on registration
-# so scan endpoints (IsEmailVerified) work without real SMTP
+# Dev convenience: skip email verification entirely.
+# Both flags must be False/True together so all code paths
+# (registration auto-verify + login bypass) are consistent.
 # ============================================================
+REQUIRE_EMAIL_VERIFICATION = False
 DEV_AUTO_VERIFY_EMAIL = True
 
 # ============================================================

@@ -29,17 +29,25 @@ class CyberDaddyTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        # Check for unverified email BEFORE calling super() so we can return
-        # a helpful message instead of the generic "No active account found".
-        email = attrs.get(self.username_field, "")
-        try:
-            pre_user = User.objects.get(email=email)
-            if not pre_user.is_email_verified and not pre_user.is_active:
-                raise serializers.ValidationError(
-                    "Please verify your email before logging in."
-                )
-        except User.DoesNotExist:
-            pass  # Wrong email — let super().validate() raise the standard error
+        from django.conf import settings as _settings
+
+        # Only enforce the email-verification gate when the feature is enabled.
+        # When REQUIRE_EMAIL_VERIFICATION=False (dev/test) users can log in
+        # immediately after registration without clicking a verification link.
+        require_verification = getattr(_settings, 'REQUIRE_EMAIL_VERIFICATION', True)
+
+        if require_verification:
+            # Check for unverified email BEFORE calling super() so we return a
+            # helpful message instead of the generic "No active account found".
+            email = attrs.get(self.username_field, "")
+            try:
+                pre_user = User.objects.get(email=email)
+                if not pre_user.is_email_verified and not pre_user.is_active:
+                    raise serializers.ValidationError(
+                        "Please verify your email before logging in."
+                    )
+            except User.DoesNotExist:
+                pass  # Wrong email — let super().validate() raise the standard error
 
         data = super().validate(attrs)
         user = self.user

@@ -379,6 +379,9 @@ SCAN_FILE_MAX_SIZE_MB = 10
 EMAIL_VERIFICATION_EXPIRY_HOURS = 24
 PASSWORD_RESET_EXPIRY_HOURS = 2
 OTP_EXPIRY_MINUTES = 10
+# Set to False in development/testing to allow login without email verification.
+# Always True in production.
+REQUIRE_EMAIL_VERIFICATION = config("REQUIRE_EMAIL_VERIFICATION", default=True, cast=bool)
 
 
 def _clean_origin(url: str) -> str:
