@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework import serializers
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import OrderingFilter
+from rest_framework.filters import OrderingFilter, SearchFilter
 from drf_spectacular.utils import extend_schema, inline_serializer, OpenApiParameter
 from drf_spectacular.openapi import OpenApiTypes
 
@@ -143,8 +143,9 @@ class ScanHistoryListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ScanHistoryListSerializer
     pagination_class = StandardResultsSetPagination
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["scan_type", "risk_level", "is_threat", "status"]
+    search_fields = ["scan_input_text", "scan_input_url", "ai_summary", "scam_category"]
     ordering_fields = ["created_at", "risk_score"]
     ordering = ["-created_at"]
 
@@ -184,6 +185,12 @@ class ScanHistoryListView(generics.ListAPIView):
                 type=OpenApiTypes.BOOL,
                 required=False,
                 description="Filter by threat flag",
+            ),
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.STR,
+                required=False,
+                description="Search through scanned content, summaries, and categories",
             ),
         ],
     )

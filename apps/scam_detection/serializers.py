@@ -60,12 +60,14 @@ class ScanHistoryListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "scan_type", "status", "risk_score",
             "risk_level", "is_threat", "scam_category",
-            "ai_summary", "created_at",
+            "ai_summary", "scan_input_text", "scan_input_url",
+            "created_at",
         ]
         read_only_fields = [
             "id", "scan_type", "status", "risk_score",
             "risk_level", "is_threat", "scam_category",
-            "ai_summary", "created_at",
+            "ai_summary", "scan_input_text", "scan_input_url",
+            "created_at",
         ]
 
 

@@ -135,7 +135,13 @@ class IsScanOwner(BasePermission):
 
 
 class HasScanQuota(BasePermission):
-    """Allow scan creation only if user has remaining scan quota."""
+    """Allow scan creation only if user has remaining scan quota.
+
+    Users without any subscription record are allowed (demo / free-tier mode).
+    The service layer handles quota enforcement separately once a subscription
+    exists — this gate only blocks users who *have* a subscription but have
+    exhausted their allocated scan count.
+    """
     message = "You have reached your scan limit. Please upgrade your plan."
 
     def has_permission(self, request, view):
@@ -146,4 +152,5 @@ class HasScanQuota(BasePermission):
         try:
             return request.user.subscription.has_scans_remaining
         except Exception:
-            return False
+            # No subscription record → demo / free mode → allow the scan.
+            return True

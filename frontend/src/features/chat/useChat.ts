@@ -148,6 +148,8 @@ export function useChat() {
                   }
                   return copy;
                 });
+                // Notify the history page that a new scan was saved
+                localStorage.setItem('cd_scan_updated', Date.now().toString());
               }
             } catch {
               // Don't show error to user — backend save is non-critical
@@ -167,7 +169,12 @@ export function useChat() {
         if ((isUrl || isSmsLike) && getAccessToken() && !text.startsWith('/')) {
           // Submit text scan in background (non-blocking)
           const scanType = isUrl ? 'url' : 'sms';
-          scanService.submitTextScan({ scan_type: scanType, content: text.trim() }).catch(() => {});
+          scanService.submitTextScan({ scan_type: scanType, content: text.trim() })
+            .then(() => {
+              // Notify the history page that a new scan was saved
+              localStorage.setItem('cd_scan_updated', Date.now().toString());
+            })
+            .catch(() => {});
         }
 
         // ── 5. Regular chat (streaming) ──────────────────

@@ -178,12 +178,17 @@ export const userService = {
 export interface APIScanListItem {
   id: string;
   scan_type: 'screenshot' | 'sms' | 'url' | 'email' | 'phone_number';
-  status: 'analyzing' | 'completed' | 'failed';
+  /** Backend status values: pending → processing → completed | failed */
+  status: 'pending' | 'processing' | 'completed' | 'failed';
   risk_level: 'safe' | 'low' | 'medium' | 'high' | 'critical' | null;
   risk_score: number | null;
   is_threat: boolean;
   scam_category: string | null;
   ai_summary: string | null;
+  /** Raw text that was scanned (SMS, email, phone) */
+  scan_input_text?: string | null;
+  /** URL that was scanned */
+  scan_input_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -210,8 +215,7 @@ export const scanService = {
   async submitScreenshotScan(file: File): Promise<APIScanSubmitResponse> {
     const formData = new FormData();
     formData.append('image', file);
-    formData.append('scan_type', 'screenshot');
-    const { data } = await apiClient.post<APIScanSubmitResponse>('/scans/submit/', formData, {
+    const { data } = await apiClient.post<APIScanSubmitResponse>('/scans/screenshot/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return data;
@@ -221,7 +225,7 @@ export const scanService = {
     scan_type: 'sms' | 'url' | 'email' | 'phone_number';
     content: string;
   }): Promise<APIScanSubmitResponse> {
-    const { data } = await apiClient.post<APIScanSubmitResponse>('/scans/submit/', payload);
+    const { data } = await apiClient.post<APIScanSubmitResponse>('/scans/text/', payload);
     return data;
   },
 

@@ -5,9 +5,9 @@
 // Connects to GET /api/v1/scans/history/ (paginated + filtered)
 // ============================================================
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/useApi';
-import { scanService, APIScanListItem, PaginatedResponse } from '@/lib/apiServices';
+import { scanService, APIScanListItem, APIScanStats, PaginatedResponse } from '@/lib/apiServices';
 import RecentScans from '@/components/dashboard/RecentScans';
 import ErrorState from '@/components/ui/ErrorState';
 import { SkeletonRow } from '@/components/ui/SkeletonLoader';
@@ -26,7 +26,9 @@ function mapBackendScans(items: APIScanListItem[]): Scan[] {
     timestamp: new Date(s.created_at),
     fileName: (() => {
       if (s.scan_type === 'screenshot') return 'screenshot.jpg';
-      return s.ai_summary?.slice(0, 40) ?? s.scan_type;
+      if (s.scan_input_url) return s.scan_input_url.slice(0, 60);
+      if (s.scan_input_text) return s.scan_input_text.slice(0, 60);
+      return s.ai_summary?.slice(0, 60) ?? s.scan_type;
     })(),
     riskScore: {
       score: Math.round(s.risk_score ?? 0),
@@ -77,12 +79,40 @@ export default function HistoryPage() {
     [page, riskFilter, typeFilter, searchQuery]
   );
 
+  const fetchStats = useCallback(() => scanService.getScanStats(), []);
+
   const {
     data,
     isLoading,
     error,
     refetch,
   } = useApi<PaginatedResponse<APIScanListItem>>(fetchHistory, { deps: [page, riskFilter, typeFilter, searchQuery] });
+
+  const {
+    data: stats,
+    refetch: refetchStats,
+  } = useApi<APIScanStats>(fetchStats, { deps: [] });
+
+  const refetchAll = useCallback(() => {
+    refetch();
+    refetchStats();
+  }, [refetch, refetchStats]);
+
+  // Auto-refresh when window regains focus (user returns from the chat page after a scan)
+  useEffect(() => {
+    const handleFocus = () => refetchAll();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [refetchAll]);
+
+  // Auto-refresh when useChat fires the 'cd_scan_updated' localStorage event
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'cd_scan_updated') refetchAll();
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [refetchAll]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,8 +135,9 @@ export default function HistoryPage() {
   const scans = data ? mapBackendScans(data.results) : [];
   const totalCount = data?.count ?? 0;
   const totalPages = Math.ceil(totalCount / 20);
-  const threats = scans.filter((s) => s.riskLevel !== 'safe').length;
-  const safe = scans.filter((s) => s.riskLevel === 'safe').length;
+  // Use the dedicated stats endpoint for accurate all-time totals
+  const totalThreats = stats?.threats_detected ?? 0;
+  const totalSafe = (stats?.total_scans ?? 0) - totalThreats;
 
   return (
     <div
@@ -139,7 +170,7 @@ export default function HistoryPage() {
             )}
           </form>
           <button
-            onClick={refetch}
+            onClick={refetchAll}
             className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
@@ -147,12 +178,12 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats — sourced from /scans/stats/ for accurate all-time totals */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total Scans', value: totalCount, color: 'text-white' },
-          { label: 'Threats Found', value: threats, color: 'text-red-400' },
-          { label: 'Safe', value: safe, color: 'text-emerald-400' },
+          { label: 'Total Scans', value: stats?.total_scans ?? totalCount, color: 'text-white' },
+          { label: 'Threats Found', value: totalThreats, color: 'text-red-400' },
+          { label: 'Safe', value: totalSafe > 0 ? totalSafe : 0, color: 'text-emerald-400' },
         ].map(({ label, value, color }) => (
           <div key={label} className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center">
             <div className={cn('text-2xl font-black', color)}>
