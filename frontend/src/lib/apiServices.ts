@@ -280,7 +280,22 @@ export const insightService = {
 export interface APIFamilyGroup {
   id: string;
   name: string;
+  description: string;
   invite_code: string;
+  is_invite_active: boolean;
+  member_count: number;
+  max_members: number;
+  status: string;
+  average_safety_score: number;
+  total_scans: number;
+  threats_detected: number;
+  admin: {
+    id: string;
+    email: string;
+    full_name: string;
+    safety_score: number;
+    avatar?: string | null;
+  } | null;
   created_at: string;
 }
 
@@ -345,6 +360,37 @@ export const familyService = {
       '/family/invite/send/',
       { email },
     );
+    return data;
+  },
+
+  async updateMemberRole(memberId: string, role: string): Promise<APIFamilyMember> {
+    const { data } = await apiClient.patch<APIFamilyMember>(
+      `/family/members/${memberId}/`,
+      { role },
+    );
+    return data;
+  },
+
+  async renameFamily(name: string): Promise<APIFamilyGroup> {
+    const { data } = await apiClient.patch<APIFamilyGroup>('/family/group/', { name });
+    return data;
+  },
+
+  async leaveFamily(): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>('/family/leave/');
+    return data;
+  },
+
+  async transferOwnership(memberId: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.post<{ success: boolean; message: string }>(
+      '/family/transfer-ownership/',
+      { member_id: memberId },
+    );
+    return data;
+  },
+
+  async deleteFamilyGroup(): Promise<{ success: boolean; message: string }> {
+    const { data } = await apiClient.delete<{ success: boolean; message: string }>('/family/delete/');
     return data;
   },
 };

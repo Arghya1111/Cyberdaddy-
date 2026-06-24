@@ -16,7 +16,7 @@ from .serializers import (
     FamilyMemberSerializer, JoinFamilySerializer,
     UpdateMemberRoleSerializer, FamilyDashboardSerializer,
 )
-from apps.core.permissions import IsFamilyAdmin, HasFamilyPlan, IsEmailVerified
+from apps.core.permissions import IsFamilyAdmin, IsEmailVerified
 from apps.core.exceptions import FamilyLimitExceededError
 from apps.core.serializers import MessageSerializer, ErrorResponseSerializer
 
@@ -27,9 +27,9 @@ class CreateFamilyGroupView(generics.CreateAPIView):
     """
     POST /api/v1/family/create/
     Create a new family group. User becomes the admin.
-    Requires Family Plan subscription.
+    Available to all authenticated users.
     """
-    permission_classes = [IsAuthenticated, IsEmailVerified, HasFamilyPlan]
+    permission_classes = [IsAuthenticated, IsEmailVerified]
     serializer_class = FamilyGroupCreateSerializer
 
     @extend_schema(
@@ -153,6 +153,21 @@ class JoinFamilyGroupView(APIView):
             join_method=FamilyMember.JoinMethod.INVITE_CODE,
         )
 
+        # Notify the family admin that a new member joined
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.send_notification(
+                user=group.admin,
+                notification_type="family_alert",
+                title="New Family Member",
+                body=f"{request.user.full_name} has joined your family circle.",
+                channel="in_app",
+                priority="normal",
+                data={"event": "member_joined", "member_id": str(member.id)},
+            )
+        except Exception as exc:
+            logger.warning(f"Family join notification failed: {exc}")
+
         return Response({
             "success": True,
             "message": f"Successfully joined {group.name}!",
@@ -233,8 +248,23 @@ class RemoveMemberView(APIView):
                     {"success": False, "error": {"message": "Admin cannot remove themselves."}},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            removed_user = member.user
             member.is_active = False
             member.save(update_fields=["is_active"])
+            # Notify the removed member
+            try:
+                from apps.notifications.services import NotificationService
+                NotificationService.send_notification(
+                    user=removed_user,
+                    notification_type="family_alert",
+                    title="Removed from Family Circle",
+                    body=f"You have been removed from {request.user.managed_family_group.name}.",
+                    channel="in_app",
+                    priority="normal",
+                    data={"event": "member_removed"},
+                )
+            except Exception as exc:
+                logger.warning(f"Member removal notification failed: {exc}")
             return Response({"success": True, "message": "Member removed from family."})
         except FamilyMember.DoesNotExist:
             return Response(
@@ -402,3 +432,204 @@ class FamilyDashboardView(APIView):
                 f"Family Dashboard Error | user={request.user.id} | error={str(e)}"
             )
             raise
+
+
+class LeaveFamilyGroupView(APIView):
+    """
+    POST /api/v1/family/leave/
+    Current user leaves their family group.
+    The admin cannot leave — they must transfer ownership first.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Family"],
+        summary="Leave family group",
+        request=None,
+        responses={
+            200: inline_serializer(
+                name="LeaveFamilyResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                },
+            ),
+            400: ErrorResponseSerializer,
+        },
+    )
+    def post(self, request):
+        if not hasattr(request.user, "family_membership"):
+            return Response(
+                {"success": False, "error": {"message": "You are not in a family group."}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        membership = request.user.family_membership
+        group = membership.family_group
+
+        if group.admin == request.user:
+            return Response(
+                {
+                    "success": False,
+                    "error": {
+                        "message": (
+                            "You are the family admin. Transfer ownership to another member "
+                            "before leaving, or delete the family group."
+                        )
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        membership.is_active = False
+        membership.save(update_fields=["is_active"])
+
+        # Notify family admin
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.send_notification(
+                user=group.admin,
+                notification_type="family_alert",
+                title="Member Left Family Circle",
+                body=f"{request.user.full_name} has left {group.name}.",
+                channel="in_app",
+                priority="normal",
+                data={"event": "member_left"},
+            )
+        except Exception as exc:
+            logger.warning(f"Leave family notification failed: {exc}")
+
+        return Response({"success": True, "message": f"You have left {group.name}."})
+
+
+class TransferOwnershipView(APIView):
+    """
+    POST /api/v1/family/transfer-ownership/
+    Transfer family admin role to another active member.
+    Only the current admin can call this.
+    """
+    permission_classes = [IsAuthenticated, IsFamilyAdmin]
+
+    @extend_schema(
+        tags=["Family"],
+        summary="Transfer family ownership",
+        request=inline_serializer(
+            name="TransferOwnershipRequest",
+            fields={"member_id": serializers.UUIDField()},
+        ),
+        responses={
+            200: inline_serializer(
+                name="TransferOwnershipResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                },
+            ),
+            400: ErrorResponseSerializer,
+        },
+    )
+    def post(self, request):
+        member_id = request.data.get("member_id")
+        if not member_id:
+            return Response(
+                {"success": False, "error": {"message": "member_id is required."}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        group = request.user.managed_family_group
+        try:
+            new_admin_membership = FamilyMember.objects.get(
+                id=member_id, family_group=group, is_active=True
+            )
+        except FamilyMember.DoesNotExist:
+            return Response(
+                {"success": False, "error": {"message": "Member not found in this family."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if new_admin_membership.user == request.user:
+            return Response(
+                {"success": False, "error": {"message": "You are already the admin."}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_admin = new_admin_membership.user
+
+        # Promote new admin's membership role
+        new_admin_membership.role = FamilyMember.MemberRole.PARENT
+        new_admin_membership.save(update_fields=["role"])
+
+        # Hand over admin field on FamilyGroup
+        group.admin = new_admin
+        group.save(update_fields=["admin"])
+
+        # Notify new admin
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.send_notification(
+                user=new_admin,
+                notification_type="family_alert",
+                title="You're now the Family Admin",
+                body=f"{request.user.full_name} has transferred ownership of {group.name} to you.",
+                channel="in_app",
+                priority="high",
+                data={"event": "ownership_transferred"},
+            )
+        except Exception as exc:
+            logger.warning(f"Transfer ownership notification failed: {exc}")
+
+        logger.info(
+            f"Family ownership transferred | group={group.id} "
+            f"from={request.user.email} to={new_admin.email}"
+        )
+        return Response({
+            "success": True,
+            "message": f"Ownership of {group.name} transferred to {new_admin.full_name}.",
+        })
+
+
+class DeleteFamilyGroupView(APIView):
+    """
+    DELETE /api/v1/family/delete/
+    Permanently delete the family group and remove all members.
+    Only the family admin can do this.
+    """
+    permission_classes = [IsAuthenticated, IsFamilyAdmin]
+
+    @extend_schema(
+        tags=["Family"],
+        summary="Delete family group",
+        request=None,
+        responses={
+            200: inline_serializer(
+                name="DeleteFamilyGroupResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "message": serializers.CharField(),
+                },
+            ),
+        },
+    )
+    def delete(self, request):
+        group = request.user.managed_family_group
+        group_name = group.name
+
+        # Notify all active members before deletion
+        try:
+            from apps.notifications.services import NotificationService
+            members = group.members.filter(is_active=True).exclude(user=request.user)
+            for m in members:
+                NotificationService.send_notification(
+                    user=m.user,
+                    notification_type="family_alert",
+                    title="Family Circle Dissolved",
+                    body=f'The family circle "{group_name}" has been deleted by the admin.',
+                    channel="in_app",
+                    priority="high",
+                    data={"event": "family_deleted"},
+                )
+        except Exception as exc:
+            logger.warning(f"Family deletion notifications failed: {exc}")
+
+        group.delete()
+        logger.info(f"Family group deleted | name={group_name} | admin={request.user.email}")
+        return Response({"success": True, "message": f'Family circle "{group_name}" has been deleted.'})
