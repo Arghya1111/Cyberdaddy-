@@ -329,8 +329,11 @@ export const familyService = {
   },
 
   async getMembers(): Promise<APIFamilyMember[]> {
-    const { data } = await apiClient.get<APIFamilyMember[]>('/family/members/');
-    return data;
+    // FamilyMembersListView may return a paginated envelope { results: [...] }
+    // depending on the global DEFAULT_PAGINATION_CLASS setting.
+    const { data } = await apiClient.get<APIFamilyMember[] | PaginatedResponse<APIFamilyMember>>('/family/members/');
+    if (Array.isArray(data)) return data;
+    return (data as PaginatedResponse<APIFamilyMember>).results ?? [];
   },
 
   async joinFamily(invite_code: string): Promise<void> {
