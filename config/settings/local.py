@@ -21,10 +21,22 @@ ALLOWED_HOSTS = ["*"]
 # Allow ngrok tunnel hosts so Django does not reject requests via ngrok.
 # ALLOWED_HOSTS = ["*"] already covers this, but also add the ngrok
 # hostname explicitly so CSRF middleware and secure cookies work.
-CSRF_TRUSTED_ORIGINS = config(
-    "CSRF_TRUSTED_ORIGINS",
-    default="http://localhost:3000,http://127.0.0.1:3000",
-    cast=Csv(),
+_csrf_from_env = [
+    o.strip().rstrip("/")
+    for o in config(
+        "CSRF_TRUSTED_ORIGINS",
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        cast=Csv(),
+    )
+    if o.strip()
+]
+CSRF_TRUSTED_ORIGINS = sorted(
+    {
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        FRONTEND_URL.rstrip("/"),  # noqa: F405 — from base.py
+    }
+    | set(_csrf_from_env)
 )
 
 # ============================================================
@@ -105,7 +117,7 @@ STRIPE_PRICE_FAMILY_YEARLY = config("STRIPE_PRICE_FAMILY_YEARLY", default="price
 
 # Celery — run tasks synchronously in dev so no worker is needed
 CELERY_TASK_ALWAYS_EAGER = True
-CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_EAGER_PROPAGATES = False
 
 # ============================================================
 # Logging - Verbose in development

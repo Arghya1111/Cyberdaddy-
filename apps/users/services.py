@@ -61,8 +61,10 @@ class UserService:
             if getattr(_settings, 'CELERY_TASK_ALWAYS_EAGER', False):
                 try:
                     send_email_verification_task(str(user.id))
-                except Exception as exc:
-                    logger.warning(f"Verification email failed (non-critical for demo): {exc}")
+                except Exception:
+                    logger.exception(
+                        "Verification email failed (non-critical) for %s", user.email
+                    )
             else:
                 send_email_verification_task.delay(str(user.id))
 
@@ -116,15 +118,18 @@ class AuthService:
         expiry_hours = expiry_hours or settings.EMAIL_VERIFICATION_EXPIRY_HOURS
         expires_at = timezone.now() + timedelta(hours=expiry_hours)
 
+        # Lookup by user + provider — registration already creates the email
+        # auth row; token_type is stored on that same record (unique_together
+        # is [user, provider], not [user, token_type]).
         UserAuth.objects.update_or_create(
             user=user,
-            token_type=token_type,
+            provider=UserAuth.AuthProvider.EMAIL,
             defaults={
                 "token": hashed,
+                "token_type": token_type,
                 "token_expires_at": expires_at,
                 "token_used_at": None,
-                "provider": UserAuth.AuthProvider.EMAIL,
-            }
+            },
         )
         return raw_token  # Return raw token to send to user
 

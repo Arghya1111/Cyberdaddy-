@@ -463,7 +463,9 @@ CELERY_CACHE_BACKEND = "django-cache"
 # in the web process (no worker required, no Redis connection).
 if not _CELERY_BROKER_URL:
     CELERY_TASK_ALWAYS_EAGER = True
-    CELERY_TASK_EAGER_PROPAGATES = True
+    # Do not propagate task exceptions into the HTTP request — email/SMS
+    # failures must not abort registration or other API responses.
+    CELERY_TASK_EAGER_PROPAGATES = False
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]

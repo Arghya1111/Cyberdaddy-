@@ -37,7 +37,7 @@ class EmailService:
             email.send()
             logger.info(f"Email sent to {to_email}: {subject}")
         except Exception as e:
-            logger.error(f"Email send failed to {to_email}: {e}")
+            logger.exception("Email send failed to %s: %s", to_email, e)
             raise
 
 

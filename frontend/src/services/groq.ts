@@ -4,8 +4,19 @@ import { GroqMessage, RiskScore } from '@/types';
 
 // ─── Client (singleton) ──────────────────────────────────
 
+function getGroqApiKey(): string {
+  const key = process.env.NEXT_PUBLIC_GROQ_API_KEY?.trim() ?? '';
+  if (!key) {
+    throw new Error(
+      'Groq API key is not configured. Add NEXT_PUBLIC_GROQ_API_KEY to frontend/.env.local ' +
+        '(get a key at console.groq.com/keys), then restart the dev server.'
+    );
+  }
+  return key;
+}
+
 const groq = new Groq({
-  apiKey: process.env.NEXT_PUBLIC_GROQ_API_KEY ?? '',
+  apiKey: getGroqApiKey(),
   dangerouslyAllowBrowser: true, // MVP: client-side calls
 });
 

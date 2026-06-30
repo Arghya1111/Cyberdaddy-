@@ -299,10 +299,23 @@ SPECTACULAR_SETTINGS = {
 # ============================================================
 # CORS — allow Vercel frontend
 # ============================================================
-CORS_ALLOWED_ORIGINS = config(
-    "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3000",
-    cast=Csv(),
+def _clean_origin(url: str) -> str:
+    return url.strip().rstrip("/")
+
+
+FRONTEND_URL = _clean_origin(config("FRONTEND_URL", default="https://your-app.vercel.app"))
+_cors_from_env = [
+    _clean_origin(o)
+    for o in config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
+    if o.strip()
+]
+CORS_ALLOWED_ORIGINS = sorted(
+    {
+        _clean_origin("http://localhost:3000"),
+        _clean_origin("http://127.0.0.1:3000"),
+        FRONTEND_URL,
+    }
+    | set(_cors_from_env)
 )
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
@@ -323,7 +336,7 @@ CORS_ALLOW_HEADERS = [
 # All tasks run synchronously via direct function calls.
 # ============================================================
 CELERY_TASK_ALWAYS_EAGER = True          # Makes .delay() / .apply_async() run synchronously
-CELERY_TASK_EAGER_PROPAGATES = True      # Propagate exceptions
+CELERY_TASK_EAGER_PROPAGATES = False     # Email/SMS failures must not abort HTTP responses
 CELERY_BROKER_URL = "memory://"          # In-memory broker (no Redis needed)
 CELERY_RESULT_BACKEND = "cache"
 CELERY_CACHE_BACKEND = "memory"
@@ -356,11 +369,16 @@ SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=False, cast=bool
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
-CSRF_TRUSTED_ORIGINS = config(
-    "CSRF_TRUSTED_ORIGINS",
-    default="https://yourusername.pythonanywhere.com",
-    cast=Csv(),
-)
+_csrf_from_env = [
+    _clean_origin(o)
+    for o in config(
+        "CSRF_TRUSTED_ORIGINS",
+        default="https://yourusername.pythonanywhere.com",
+        cast=Csv(),
+    )
+    if o.strip()
+]
+CSRF_TRUSTED_ORIGINS = sorted({FRONTEND_URL} | set(_csrf_from_env))
 
 # ============================================================
 # AWS S3 — disabled for MVP (use local media)
@@ -394,7 +412,7 @@ FIREBASE_CREDENTIALS_PATH = ""
 # ============================================================
 # Application-Specific Settings
 # ============================================================
-FRONTEND_URL = config("FRONTEND_URL", default="https://your-app.vercel.app")
+# FRONTEND_URL is defined above with _clean_origin (CORS section).
 INVITE_CODE_EXPIRY_HOURS = config("INVITE_CODE_EXPIRY_HOURS", default=48, cast=int)
 MAX_FAMILY_MEMBERS = config("MAX_FAMILY_MEMBERS", default=10, cast=int)
 SCAN_FILE_MAX_SIZE_MB = 10

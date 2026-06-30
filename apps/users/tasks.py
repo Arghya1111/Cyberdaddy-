@@ -47,7 +47,12 @@ def send_email_verification_task(self, user_id: str):
         logger.info(f"Verification email sent to: {user.email}")
 
     except Exception as exc:
-        logger.error(f"Failed to send verification email for user {user_id}: {exc}")
+        logger.exception(
+            "Failed to send verification email for user %s: %s", user_id, exc
+        )
+        # Registration must succeed even when email delivery fails.
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            return {"status": "failed", "error": str(exc)}
         raise self.retry(exc=exc)
 
 

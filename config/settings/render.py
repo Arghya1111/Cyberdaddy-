@@ -54,7 +54,7 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []  # noqa: F405
 # provision a Render Redis service.
 # ============================================================
 CELERY_TASK_ALWAYS_EAGER = True
-CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_EAGER_PROPAGATES = False
 
 # ============================================================
 # Static & media files — WhiteNoise / local filesystem

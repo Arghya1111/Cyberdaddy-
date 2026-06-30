@@ -81,10 +81,17 @@ class RegisterView(generics.CreateAPIView):
         },
     )
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        # TODO: Re-enable email verification in production
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+        except Exception:
+            logger.exception(
+                "Registration failed for email=%s",
+                request.data.get("email", "<unknown>"),
+            )
+            raise
+
         if getattr(settings, 'REQUIRE_EMAIL_VERIFICATION', True):
             message = "Account created. Please check your email to verify your account."
         else:
