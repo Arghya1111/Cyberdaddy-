@@ -7,7 +7,7 @@
 //         → POST /users/auth/password-reset/confirm/
 // ============================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Shield, ArrowLeft, Mail, Loader2, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
@@ -236,7 +236,7 @@ function ConfirmResetForm({ token }: { token: string }) {
 
 // ── Page Shell ────────────────────────────────────────────
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
   const searchParams = useSearchParams();
   const [resetToken, setResetToken] = useState<string | null>(null);
 
@@ -260,5 +260,19 @@ export default function ForgotPasswordPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full max-w-md flex justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+        </div>
+      }
+    >
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }

@@ -302,6 +302,7 @@ export interface APIFamilyGroup {
 export interface APIFamilyMember {
   id: string;
   role: 'parent' | 'child' | 'guardian' | 'member';
+  is_active: boolean;
   user: {
     id: string;
     email: string;
