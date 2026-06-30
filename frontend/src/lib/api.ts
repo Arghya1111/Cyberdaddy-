@@ -67,21 +67,14 @@ export function normalizeError(err: unknown): APIError {
 }
 
 // ─── Axios instance ───────────────────────────────────────
-
-// In production (Vercel) always use the Next.js proxy so the browser
-// never makes a cross-origin request and CORS is not needed.
-// next.config.ts rewrites  /api/:path*  →  <backend>/api/:path*
-// (the backend destination is configured via NEXT_PUBLIC_API_URL there).
 //
-// In local development, NEXT_PUBLIC_API_URL can be set to call the
-// local Django server directly (e.g. http://localhost:8000) without
-// needing the proxy, because local.py sets CORS_ALLOW_ALL_ORIGINS=True.
-const BASE_URL =
-  process.env.NODE_ENV === 'production'
-    ? '/api/v1'
-    : process.env.NEXT_PUBLIC_API_URL
-    ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
-    : '/api/v1';
+// Always use the same-origin proxy (/api/v1) so the browser never makes
+// cross-origin requests. next.config.ts (dev) and vercel.json (prod) rewrite
+// /api/* → <NEXT_PUBLIC_API_URL or Render>/api/* server-side.
+//
+// NEXT_PUBLIC_API_URL configures the rewrite destination only — not the
+// axios base URL. Set it to http://localhost:8000 when running Django locally.
+const BASE_URL = '/api/v1';
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,

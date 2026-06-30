@@ -1,19 +1,12 @@
 import type { NextConfig } from 'next';
 
-// ── Backend URL ───────────────────────────────────────────────────────────────
-// NEXT_PUBLIC_API_URL controls where the Next.js proxy sends /api/* requests.
-// It is evaluated at BUILD TIME on Vercel — never at runtime in the browser.
-//
-// Production (Vercel deploy): leave NEXT_PUBLIC_API_URL unset (or set it to
-//   https://cyberdaddy.onrender.com in the Vercel project settings).
-//   The browser always calls /api/v1/* → Vercel edge rewrites → Django.
-//   No CORS headers are needed because the browser sees only the Vercel origin.
-//
-// Local dev: set NEXT_PUBLIC_API_URL=http://localhost:8000 in .env.local.
-//   api.ts will call Django directly; local.py sets CORS_ALLOW_ALL_ORIGINS=True.
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://cyberdaddy.onrender.com';
+// NEXT_PUBLIC_API_URL is read by src/app/api/v1/[...path]/route.ts at runtime.
 
 const nextConfig: NextConfig = {
+  // Django API routes require trailing slashes. Next.js otherwise 308-redirects
+  // /api/.../  →  /api/... before route handlers run, breaking POST proxy requests.
+  skipTrailingSlashRedirect: true,
+
   images: {
     dangerouslyAllowSVG: true,
     unoptimized: true,
@@ -22,25 +15,14 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'cyberdaddy-api.onrender.com' },
       { protocol: 'https', hostname: '*.ngrok-free.app' },
       { protocol: 'https', hostname: '*.ngrok-free.dev' },
-      { protocol: 'http',  hostname: '127.0.0.1' },
-      { protocol: 'http',  hostname: 'localhost' },
+      { protocol: 'http', hostname: '127.0.0.1' },
+      { protocol: 'http', hostname: 'localhost' },
     ],
   },
 
-  // ── Server-side CORS proxy ────────────────────────────────────────────────
-  // All browser API calls use relative URLs (/api/v1/*).
-  // Vercel's edge network rewrites them to the Django backend server-side,
-  // so the browser never makes a cross-origin request — no CORS needed.
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${BACKEND_URL}/api/:path*`,
-      },
-    ];
-  },
+  // API proxy is handled by src/app/api/v1/[...path]/route.ts (server-side fetch).
+  // Do not add rewrites here — Next.js trailing-slash redirects break Django POST requests.
 
-  // ── Security headers ──────────────────────────────────────────────────────
   async headers() {
     return [
       {

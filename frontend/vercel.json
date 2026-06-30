@@ -15,11 +15,5 @@
   ],
   "env": {
     "NEXT_PUBLIC_APP_NAME": "CyberDaddy"
-  },
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://cyberdaddy.onrender.com/api/:path*"
-    }
-  ]
+  }
 }
